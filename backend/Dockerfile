@@ -10,7 +10,7 @@ FROM php:8.4-cli
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libpq-dev unzip git \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" gd zip pdo_pgsql pdo_sqlite opcache \
+    && docker-php-ext-install -j"$(nproc)" gd zip pdo_pgsql opcache \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Composer (no se instala como dependencia de sistema aparte: se copia el binario oficial)
