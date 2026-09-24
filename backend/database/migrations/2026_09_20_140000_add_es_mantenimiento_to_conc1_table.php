@@ -18,7 +18,7 @@ return new class extends Migration
         });
 
         // marca el concepto que ya existe con ese nombre
-        $id = DB::table('CONC1')->whereRaw('LOWER(DESCR) = ?', ['cuota de mantenimiento'])->orderBy('NUM_CPTO')->value('NUM_CPTO');
+        $id = DB::table('CONC1')->whereRaw('LOWER("DESCR") = ?', ['cuota de mantenimiento'])->orderBy('NUM_CPTO')->value('NUM_CPTO');
         if ($id !== null) {
             DB::table('CONC1')->where('NUM_CPTO', $id)->update(['ES_MANTENIMIENTO' => true]);
         }
