@@ -1,0 +1,17 @@
+# Este proyecto son dos apps (backend/ y frontend/), cada una con su propio .gitignore (vendor,
+# node_modules, .env, *.sqlite, dist, etc.). Esto es lo que se excluye a nivel de la carpeta raiz.
+
+# Datos internos del hotel: IP/puerto/usuario del servidor SQL Server real (TPVADMIN) y el brief
+# original del cliente. Se quedan solo en este equipo -- no van a un repositorio por defecto,
+# aunque sea privado. Si en algun momento se quieren versionar, quitar esta linea a proposito.
+/informacion/
+
+# Salida de prueba (PDF/Excel generados para revisar los reportes) -- no es codigo fuente.
+/exportaciones-de-prueba/
+
+# Configuracion personal de Claude Code en este equipo (no es del proyecto).
+/.claude/
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db

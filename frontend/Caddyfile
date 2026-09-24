@@ -1,0 +1,14 @@
+# Sirve el build de Vite en el puerto que Railway indique (${PORT}), sin HTTPS propio: Railway ya
+# termina el HTTPS en su borde y le manda trafico plano al contenedor, asi que Caddy no necesita
+# (ni debe) intentar sacar su propio certificado -- por eso el bloque usa ":{$PORT}", solo puerto,
+# sin nombre de dominio.
+:{$PORT}
+
+root * /srv
+encode gzip
+
+# El router de Vue usa "history mode" (URLs sin "#"): si la ruta pedida no es un archivo real
+# (ej. /reportes al recargar la pagina), sirve index.html y que Vue Router tome el control. Sin
+# esto, cualquier URL que no sea la raiz da 404 al recargar.
+try_files {path} /index.html
+file_server

@@ -1,0 +1,15 @@
+# Configuracion de Netlify para el frontend (carpeta frontend/). El repo completo puede
+# conectarse a Netlify y decirle "base directory: frontend" -- no hace falta subir una carpeta
+# aparte; Netlify hace el build el solo en cada push.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# El router de Vue usa "history mode" (URLs sin "#"): sin esta regla, recargar la pagina en
+# cualquier ruta que no sea la raiz (ej. /reportes) da 404, porque Netlify buscaria un archivo
+# real en esa ruta. Con esto, cualquier URL entrega index.html y Vue Router toma el control.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

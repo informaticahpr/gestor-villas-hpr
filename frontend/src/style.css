@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Lato", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Lato", ui-sans-serif, system-ui, sans-serif;
+
+  /* Paleta tomada del logo de Palma Real: mariposa en degradado rojo -> naranja -> dorado,
+     wordmark en cafe espresso y script en dorado mostaza. */
+  --color-brand-50: #fdf4ec;
+  --color-brand-100: #fbe7d3;
+  --color-brand-200: #f6cca0;
+  --color-brand-300: #efad6e;
+  --color-brand-400: #e38b42;
+  --color-brand-500: #d46e22;
+  --color-brand-600: #b85618;
+  --color-brand-700: #954214;
+  --color-brand-800: #723314;
+  --color-brand-900: #4a2412;
+
+  --color-wine-500: #a81f2e;
+  --color-wine-600: #8c1926;
+
+  --color-gold-300: #e8c468;
+  --color-gold-500: #b8860b;
+  --color-gold-600: #96700a;
+
+  --color-espresso-700: #4a3626;
+  --color-espresso-800: #34241a;
+  --color-espresso-900: #241811;
+
+  --color-cream-50: #fffdfa;
+  --color-cream-100: #fbf7f0;
+  --color-cream-200: #f5eee1;
+}
+
+body {
+  background-color: var(--color-cream-100);
+  color: var(--color-espresso-800);
+}
