@@ -1,8 +1,7 @@
 # Gestor de Villas HPR
 
 Sistema de gestión de saldos de Villas HPR. Ver `informacion/Sistema de Gestión de Saldos Villas HPR.docx`
-para los requerimientos originales y `docs/` para el análisis de la base de datos existente
-(`TPVADMIN`) y el diseño del esquema nuevo.
+para los requerimientos originales y `docs/` para el análisis de la base de datos existente y el diseño del esquema nuevo.
 
 ```
 Gestor de Villas HPR/
