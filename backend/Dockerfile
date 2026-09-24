@@ -8,7 +8,7 @@ FROM php:8.4-cli
 #   - gd: imagenes en los PDF/Excel (logo)      - zip: leer/escribir .xlsx (PhpSpreadsheet)
 #   - libpq: driver de PostgreSQL (pdo_pgsql)   - freetype/libpng/libzip: requeridas por gd/zip
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libpq-dev unzip git \
+        libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libpq-dev sqlite3-dev unzip git \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" gd zip pdo_pgsql pdo_sqlite opcache \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
