@@ -8,6 +8,7 @@ use App\Models\Villa;
 use App\Services\SaldoService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VillaController extends Controller
 {
@@ -57,7 +58,7 @@ class VillaController extends Controller
      */
     private function columnaSinAcentos(string $columna): string
     {
-        $expr = "LOWER({$columna})";
+        $expr = 'LOWER('.DB::getQueryGrammar()->wrap($columna).')';
         foreach (self::MAPA_ACENTOS as $con => $sin) {
             $expr = "REPLACE({$expr}, '{$con}', '{$sin}')";
         }

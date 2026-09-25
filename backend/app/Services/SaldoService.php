@@ -6,6 +6,7 @@ use App\Models\Movimiento;
 use App\Models\Villa;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class SaldoService
 {
@@ -39,18 +40,25 @@ class SaldoService
      *
      * @return Collection<string, float>
      */
-    public function saldosPorVilla(?Carbon $hasta = null): Collection
+        public function saldosPorVilla(?Carbon $hasta = null): Collection
     {
         $hasta ??= Carbon::today();
+
+        $g = DB::getQueryGrammar();
 
         return Movimiento::query()
             ->join('CONC1', 'CONC1.NUM_CPTO', '=', 'CUEN1.NUM_CPTO')
             ->where('CUEN1.FECHA_APLI', '<=', $hasta)
             ->groupBy('CUEN1.CLV_CLIE')
-            // "= true" (no "= 1"): en SQLite y MySQL un boolean se guarda como 0/1 y "=1" tambien
-            // funcionaria, pero en PostgreSQL es un tipo boolean real y "=1" lanza un error de
-            // tipos ("operator does not exist: boolean = integer"). "= true" es valido en los tres.
-            ->selectRaw('CUEN1.CLV_CLIE as villa, SUM(CASE WHEN CONC1.ES_CARGO = true THEN CUEN1.IMPORTE ELSE -CUEN1.IMPORTE END) as saldo')
+            // wrap() pone las comillas correctas: en PostgreSQL las tablas/columnas en mayusculas
+            // se crean entre comillas y sin ellas Postgres las busca en minusculas y falla.
+            ->selectRaw(sprintf(
+                '%s as villa, SUM(CASE WHEN %s = true THEN %s ELSE -%s END) as saldo',
+                $g->wrap('CUEN1.CLV_CLIE'),
+                $g->wrap('CONC1.ES_CARGO'),
+                $g->wrap('CUEN1.IMPORTE'),
+                $g->wrap('CUEN1.IMPORTE'),
+            ))
             ->get()
             ->mapWithKeys(fn ($fila) => [$fila->villa => round((float) $fila->saldo, 2)]);
     }
