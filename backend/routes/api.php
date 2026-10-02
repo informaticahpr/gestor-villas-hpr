@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BitacoraController;
 use App\Http\Controllers\Api\ConceptoController;
 use App\Http\Controllers\Api\CuotaMantenimientoController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FormaPagoController;
 use App\Http\Controllers\Api\HoyController;
 use App\Http\Controllers\Api\MovimientoController;
@@ -45,6 +46,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reportes/antiguedad-saldos/pdf', [ReporteController::class, 'antiguedadSaldosPdf']);
 
     Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN)->group(function () {
+        Route::get('/dashboard', DashboardController::class);
+
         Route::put('/villas/{villa}', [VillaController::class, 'update']);
         Route::patch('/villas/{villa}/cuota-especial', [VillaController::class, 'actualizarCuotaEspecial']);
         Route::post('/conceptos', [ConceptoController::class, 'store']);
