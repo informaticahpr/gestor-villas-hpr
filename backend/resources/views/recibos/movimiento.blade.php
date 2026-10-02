@@ -11,9 +11,25 @@
         .importe { font-size: 20px; font-weight: bold; margin: 20px 0; }
         .leyenda { border-top: 1px solid #cbb994; padding-top: 16px; margin-top: 16px; line-height: 1.6; }
         .pie { margin-top: 40px; font-size: 11px; color: #6b5c4f; }
+        .anulado { border: 2px solid #a81f2e; color: #a81f2e; padding: 10px 14px; margin-bottom: 20px; }
+        .anulado .sello { font-size: 22px; font-weight: bold; letter-spacing: 4px; }
+        .anulado .detalle { font-size: 11px; margin-top: 4px; }
+        .marca-agua { position: fixed; top: 38%; left: 0; width: 100%; text-align: center; font-size: 110px;
+            font-weight: bold; color: #a81f2e; opacity: 0.12; transform: rotate(-30deg); }
 @endsection
 
 @section('contenido')
+    @if ($movimiento->anulado())
+        <div class="marca-agua">ANULADO</div>
+        <div class="anulado">
+            <div class="sello">ANULADO</div>
+            <div class="detalle">
+                Anulado por {{ $movimiento->anuladoPor->name ?? '—' }} el {{ $movimiento->ANULADO_EN->format('d/m/Y H:i') }}.
+                Motivo: {{ $movimiento->MOTIVO_ANULACION }}
+            </div>
+        </div>
+    @endif
+
     <div class="folio">
         <div class="tipo">Folio</div>
         <div class="numero">{{ $movimiento->FOLIO ?? '—' }}</div>

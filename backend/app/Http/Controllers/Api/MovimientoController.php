@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Bitacora;
 use App\Models\Concepto;
 use App\Models\Movimiento;
 use App\Models\Villa;
 use App\Services\FolioService;
 use App\Services\SaldoService;
+use App\Support\Formato;
 use App\Support\Paginacion;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -42,7 +44,9 @@ class MovimientoController extends Controller
             ...Paginacion::mensajes(),
         ]);
 
-        $query = Movimiento::with(['villa', 'concepto', 'formaPago', 'usuario'])
+        // Reimpresion muestra tambien los anulados (marcados como tales) para que quede el rastro del folio.
+        $query = Movimiento::conAnulados()
+            ->with(['villa', 'concepto', 'formaPago', 'usuario', 'anuladoPor'])
             ->orderByDesc('FECHA_APLI')
             ->orderByDesc('ID_MOV');
 
@@ -77,6 +81,10 @@ class MovimientoController extends Controller
                 'forma_pago' => $m->formaPago?->nombre,
                 'usuario' => $m->usuario?->name ?? 'Sistema',
                 'observacion' => $m->OBS,
+                'anulado' => $m->anulado(),
+                'anulado_en' => $m->ANULADO_EN?->toIso8601String(),
+                'anulado_por' => $m->anulado() ? ($m->anuladoPor?->name ?? '—') : null,
+                'motivo_anulacion' => $m->MOTIVO_ANULACION,
             ]),
             'meta' => [
                 'pagina' => $pagina->currentPage(),
@@ -217,6 +225,47 @@ class MovimientoController extends Controller
             'villas_con_cuota_especial' => $villasConCuotaEspecial,
             'concepto' => $concepto,
         ], 201);
+    }
+
+    /**
+     * Anula un cargo o abono capturado por error (solo Director/Admin). No se borra: conserva su
+     * folio y queda quien, cuando y por que; pero deja de contar en saldos, estados de cuenta,
+     * reportes y dashboard. El movimiento correcto se vuelve a capturar normal, con folio nuevo.
+     */
+    public function anular(Request $request, Movimiento $movimiento)
+    {
+        $data = $request->validate([
+            'motivo' => ['required', 'string', 'min:5', 'max:255'],
+        ], [
+            'motivo.required' => 'Debes indicar el motivo de la anulación.',
+            'motivo.min' => 'Describe el motivo con un poco más de detalle.',
+            'motivo.max' => 'El motivo no puede superar los 255 caracteres.',
+        ]);
+
+        if ($movimiento->anulado()) {
+            throw ValidationException::withMessages([
+                'motivo' => 'Este movimiento ya está anulado.',
+            ]);
+        }
+
+        $movimiento->anular($request->user(), trim($data['motivo']));
+        $movimiento->load('concepto');
+
+        $villa = Villa::findOrFail($movimiento->CLV_CLIE);
+        $this->saldoService->recalcularSaldo($villa);
+
+        $tipo = $movimiento->concepto->ES_CARGO ? 'el cargo' : 'el abono';
+        Bitacora::registrar(
+            'movimiento',
+            'anular',
+            'Anuló '.$tipo.' folio '.($movimiento->FOLIO ?? $movimiento->ID_MOV).' ('.$movimiento->concepto->DESCR.') de la villa '
+                .$movimiento->CLV_CLIE.' por '.Formato::monto((float) $movimiento->IMPORTE).'. Motivo: '.$movimiento->MOTIVO_ANULACION,
+        );
+
+        return response()->json([
+            'id' => $movimiento->ID_MOV,
+            'saldo_villa' => (float) $villa->SALDO,
+        ]);
     }
 
     /**

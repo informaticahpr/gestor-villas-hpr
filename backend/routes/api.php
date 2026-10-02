@@ -48,6 +48,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN)->group(function () {
         Route::get('/dashboard', DashboardController::class);
 
+        Route::patch('/movimientos/{movimiento}/anular', [MovimientoController::class, 'anular']);
+
         Route::put('/villas/{villa}', [VillaController::class, 'update']);
         Route::patch('/villas/{villa}/cuota-especial', [VillaController::class, 'actualizarCuotaEspecial']);
         Route::post('/conceptos', [ConceptoController::class, 'store']);

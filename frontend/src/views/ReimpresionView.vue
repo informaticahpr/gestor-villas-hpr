@@ -7,6 +7,8 @@ import { abrirRecibo } from '../lib/exportar'
 import { mensajeDeError } from '../lib/errors'
 import { useToastStore } from '../stores/toast'
 import { useDataStore } from '../stores/data'
+import { useAuthStore } from '../stores/auth'
+import { useEscapeKey } from '../lib/useEscapeKey'
 import FechaInput from '../components/FechaInput.vue'
 import VillaBuscador from '../components/VillaBuscador.vue'
 import PaginacionControles from '../components/PaginacionControles.vue'
@@ -14,6 +16,7 @@ import type { MovimientoListado, MetaPaginacion } from '../types'
 
 const toast = useToastStore()
 const dataStore = useDataStore()
+const auth = useAuthStore()
 
 const movimientos = ref<MovimientoListado[]>([])
 const cargando = ref(false)
@@ -92,6 +95,44 @@ onMounted(cargar)
 // se refresca si se aplica un cargo/abono desde el modal del menu superior
 watch(() => dataStore.version, cargar)
 
+// --- Anulacion (solo Director/Admin; el backend tambien lo restringe) ---
+// El movimiento no se borra: queda en esta lista marcado ANULADO, pero deja de contar en saldos,
+// estado de cuenta, reportes y dashboard. El correcto se vuelve a capturar desde Cargo/Crédito.
+const porAnular = ref<MovimientoListado | null>(null)
+const motivo = ref('')
+const anulando = ref(false)
+
+function pedirAnulacion(m: MovimientoListado) {
+  porAnular.value = m
+  motivo.value = ''
+}
+
+function cerrarAnulacion() {
+  if (anulando.value) return
+  porAnular.value = null
+}
+
+useEscapeKey(() => {
+  if (!porAnular.value) return false
+  cerrarAnulacion()
+  return true
+})
+
+async function confirmarAnulacion() {
+  if (!porAnular.value || motivo.value.trim().length < 5) return
+  anulando.value = true
+  try {
+    await api.patch(`/api/movimientos/${porAnular.value.id}/anular`, { motivo: motivo.value.trim() })
+    toast.success(`Folio ${porAnular.value.folio ?? porAnular.value.id} anulado. Ya no cuenta en el saldo de la villa ${porAnular.value.villa}.`)
+    porAnular.value = null
+    dataStore.tocar() // refresca esta lista, el dashboard y los saldos abiertos
+  } catch (e: any) {
+    toast.error(mensajeDeError(e, 'No se pudo anular el movimiento.'))
+  } finally {
+    anulando.value = false
+  }
+}
+
 const claseCampo =
   'rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200'
 </script>
@@ -101,6 +142,7 @@ const claseCampo =
     <p class="mb-1 font-display text-2xl font-semibold text-espresso-800">Reimpresión</p>
     <p class="mb-5 text-sm text-espresso-800/60">
       Recibos de los cargos y abonos aplicados. Busca el movimiento y ábrelo para volver a imprimir su recibo.
+      <template v-if="auth.esDirectorOAdmin()">Si se capturó por error, anúlalo y vuelve a capturar el correcto.</template>
     </p>
 
     <form
@@ -163,7 +205,7 @@ const claseCampo =
           </tr>
         </thead>
         <tbody class="divide-y divide-gold-300/15">
-          <tr v-for="m in movimientos" :key="m.id" class="hover:bg-brand-50/40">
+          <tr v-for="m in movimientos" :key="m.id" class="hover:bg-brand-50/40" :class="m.anulado ? 'bg-espresso-800/[0.03] text-espresso-800/50' : ''">
             <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-espresso-900">{{ m.folio ?? '—' }}</td>
             <td class="whitespace-nowrap px-4 py-2.5 text-espresso-800/80">{{ formatearFecha(m.fecha) }}</td>
             <td class="px-4 py-2.5">
@@ -182,10 +224,25 @@ const claseCampo =
               >
                 {{ m.tipo === 'cargo' ? 'Cargo' : 'Crédito' }}
               </span>
+              <span
+                v-if="m.anulado"
+                class="ml-1 mt-1 inline-block rounded-full bg-wine-500/10 px-2.5 py-0.5 text-xs font-semibold text-wine-600"
+                :title="`Anulado por ${m.anulado_por} — ${m.motivo_anulacion}`"
+              >
+                Anulado
+              </span>
             </td>
-            <td class="whitespace-nowrap px-4 py-2.5 text-right font-medium text-espresso-900">{{ formatearMonto(m.importe) }}</td>
+            <td class="whitespace-nowrap px-4 py-2.5 text-right font-medium" :class="m.anulado ? 'text-espresso-800/45 line-through' : 'text-espresso-900'">{{ formatearMonto(m.importe) }}</td>
             <td class="px-4 py-2.5 text-espresso-800/70">{{ m.usuario }}</td>
-            <td class="px-4 py-2.5 text-right">
+            <td class="whitespace-nowrap px-4 py-2.5 text-right">
+              <button
+                v-if="auth.esDirectorOAdmin() && !m.anulado"
+                type="button"
+                class="mr-2 whitespace-nowrap rounded-lg border border-wine-500/30 px-3 py-1.5 text-sm font-medium text-wine-600 hover:bg-wine-500/5"
+                @click="pedirAnulacion(m)"
+              >
+                Anular
+              </button>
               <button
                 type="button"
                 class="whitespace-nowrap rounded-lg border border-espresso-800/20 px-3 py-1.5 text-sm font-medium text-espresso-700 hover:bg-brand-50"
@@ -201,6 +258,66 @@ const claseCampo =
         </tbody>
       </table>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="porAnular"
+        class="fixed inset-0 z-[60] flex items-center justify-center bg-espresso-900/50 p-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        @click.self="cerrarAnulacion"
+      >
+        <form class="w-full max-w-md rounded-2xl bg-cream-50 shadow-2xl shadow-espresso-900/20" @submit.prevent="confirmarAnulacion">
+          <div class="rounded-t-2xl border-b border-gold-300/30 bg-gradient-to-r from-wine-500/10 to-cream-50 px-6 py-4">
+            <h2 class="font-display text-lg font-semibold text-espresso-800">
+              Anular {{ porAnular.tipo === 'cargo' ? 'cargo' : 'abono' }} {{ porAnular.folio ?? '' }}
+            </h2>
+            <p class="mt-1 text-xs text-espresso-800/55">
+              Villa {{ porAnular.villa }} · {{ porAnular.concepto }} · {{ formatearFecha(porAnular.fecha) }} ·
+              {{ formatearMonto(porAnular.importe) }}
+            </p>
+          </div>
+
+          <div class="space-y-3 px-6 py-5 text-sm">
+            <p class="text-espresso-800/75">
+              El movimiento dejará de contar en el saldo y no saldrá en el estado de cuenta. Seguirá visible aquí
+              marcado como <strong class="text-wine-600">ANULADO</strong> y quedará registrado en la bitácora.
+              <strong>No se puede deshacer.</strong>
+            </p>
+            <div>
+              <label class="mb-1 block font-medium text-espresso-700">Motivo de la anulación</label>
+              <textarea
+                v-model="motivo"
+                rows="3"
+                maxlength="255"
+                required
+                placeholder="Ej. Se capturó en la villa equivocada"
+                :class="[claseCampo, 'w-full resize-none']"
+                autofocus
+              />
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-2 rounded-b-2xl border-t border-gold-300/30 px-6 py-4">
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 text-sm font-medium text-espresso-700 hover:bg-espresso-800/5"
+              :disabled="anulando"
+              @click="cerrarAnulacion"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="rounded-lg bg-wine-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-wine-600 disabled:opacity-50"
+              :disabled="anulando || motivo.trim().length < 5"
+            >
+              {{ anulando ? 'Anulando...' : 'Anular' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
 
     <PaginacionControles
       :pagina="meta.pagina"

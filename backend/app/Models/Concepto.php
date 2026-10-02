@@ -32,8 +32,9 @@ class Concepto extends Model
         return static::where('ES_MANTENIMIENTO', true)->first();
     }
 
+    // Incluye los anulados: siguen referenciando el concepto, asi que tambien impiden borrarlo o cambiar su tipo.
     public function movimientos(): HasMany
     {
-        return $this->hasMany(Movimiento::class, 'NUM_CPTO', 'NUM_CPTO');
+        return $this->hasMany(Movimiento::class, 'NUM_CPTO', 'NUM_CPTO')->withoutGlobalScope('vigentes');
     }
 }

@@ -27,6 +27,7 @@ class BitacoraController extends Controller
         'forma_pago' => 'Formas de pago',
         'cuota_especial' => 'Cuotas especiales',
         'cuota_mantenimiento' => 'Cuota de mantenimiento',
+        'movimiento' => 'Cargos y abonos',
     ];
 
     public function __construct(private readonly ReporteExcelService $excel) {}

@@ -62,8 +62,8 @@ export interface FormaPago {
   activo: boolean
 }
 
-export type EntidadBitacora = 'usuario' | 'concepto' | 'forma_pago' | 'cuota_especial' | 'cuota_mantenimiento'
-export type AccionBitacora = 'crear' | 'editar' | 'activar' | 'desactivar' | 'eliminar'
+export type EntidadBitacora = 'usuario' | 'concepto' | 'forma_pago' | 'cuota_especial' | 'cuota_mantenimiento' | 'movimiento'
+export type AccionBitacora = 'crear' | 'editar' | 'activar' | 'desactivar' | 'eliminar' | 'anular'
 
 export interface MetaPaginacion {
   pagina: number
@@ -91,6 +91,11 @@ export interface MovimientoListado {
   forma_pago: string | null
   usuario: string
   observacion: string | null
+  /** Anulado por Director/Admin: no cuenta en saldos ni sale en el estado de cuenta. */
+  anulado: boolean
+  anulado_en: string | null
+  anulado_por: string | null
+  motivo_anulacion: string | null
 }
 
 export interface RegistroBitacora {

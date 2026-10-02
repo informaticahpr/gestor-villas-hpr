@@ -20,6 +20,7 @@ class FormaPago extends Model
 
     public function movimientos(): HasMany
     {
-        return $this->hasMany(Movimiento::class, 'FORMA_PAGO_ID');
+        // incluye los anulados: siguen referenciando la forma de pago, asi que tambien impiden borrarla
+        return $this->hasMany(Movimiento::class, 'FORMA_PAGO_ID')->withoutGlobalScope('vigentes');
     }
 }

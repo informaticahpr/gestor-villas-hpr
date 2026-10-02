@@ -11,7 +11,7 @@ class ReciboController extends Controller
 {
     public function pdf(Movimiento $movimiento)
     {
-        $movimiento->load(['villa', 'concepto', 'formaPago', 'usuario']);
+        $movimiento->load(['villa', 'concepto', 'formaPago', 'usuario', 'anuladoPor']);
 
         $pdf = Pdf::loadView('recibos.movimiento', [
             'titulo' => 'Recibo de '.($movimiento->concepto->ES_CARGO ? 'Cargo' : 'Crédito / Abono'),

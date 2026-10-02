@@ -507,6 +507,7 @@ const ENTIDADES: Array<{ value: EntidadBitacora; label: string }> = [
   { value: 'forma_pago', label: 'Formas de pago' },
   { value: 'cuota_especial', label: 'Cuotas especiales' },
   { value: 'cuota_mantenimiento', label: 'Cuota de mantenimiento' },
+  { value: 'movimiento', label: 'Cargos y abonos' },
 ]
 
 const ACCIONES: Array<{ value: AccionBitacora; label: string }> = [
@@ -515,6 +516,7 @@ const ACCIONES: Array<{ value: AccionBitacora; label: string }> = [
   { value: 'activar', label: 'Activar' },
   { value: 'desactivar', label: 'Desactivar' },
   { value: 'eliminar', label: 'Eliminar' },
+  { value: 'anular', label: 'Anular' },
 ]
 
 function etiquetaEntidad(entidad: string): string {
@@ -531,6 +533,7 @@ function colorAccion(accion: string): string {
     case 'desactivar':
       return 'bg-gold-200/70 text-espresso-800'
     case 'eliminar':
+    case 'anular':
       return 'bg-wine-100 text-wine-800'
     default:
       return 'bg-espresso-800/10 text-espresso-800/60'
