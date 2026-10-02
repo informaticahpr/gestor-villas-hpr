@@ -30,9 +30,9 @@ class DashboardController extends Controller
         // Movimientos del año hasta hoy; se agrupan por mes aqui (no en SQL) para no depender de
         // funciones de fecha distintas entre PostgreSQL y otros motores.
         $movimientos = Movimiento::query()
-            ->join('CONC1', 'CONC1.NUM_CPTO', '=', 'CUEN1.NUM_CPTO')
-            ->whereBetween('CUEN1.FECHA_APLI', [$hoy->copy()->startOfYear(), $hoy])
-            ->get(['CUEN1.FECHA_APLI', 'CUEN1.IMPORTE', 'CONC1.ES_CARGO']);
+            ->join('conceptos', 'conceptos.NUM_CPTO', '=', 'movimientos.NUM_CPTO')
+            ->whereBetween('movimientos.FECHA_APLI', [$hoy->copy()->startOfYear(), $hoy])
+            ->get(['movimientos.FECHA_APLI', 'movimientos.IMPORTE', 'conceptos.ES_CARGO']);
 
         $meses = collect(range(1, $hoy->month))->mapWithKeys(fn ($m) => [$m => ['mes' => $m, 'cxc' => 0.0, 'recuperado' => 0.0]])->all();
 

@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Movimiento extends Model
 {
-    protected $table = 'CUEN1';
+    protected $table = 'movimientos';
 
     protected $primaryKey = 'ID_MOV';
 

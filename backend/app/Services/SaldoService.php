@@ -34,7 +34,7 @@ class SaldoService
      * Saldo de todas las villas a la fecha dada (por defecto, hoy) en una sola consulta:
      * [CLV_CLIE => saldo]. Las villas sin movimientos no aparecen (su saldo es 0).
      *
-     * Es el saldo que muestran las pantallas y se calcula al momento, no se lee de CLIE1.SALDO:
+     * Es el saldo que muestran las pantallas y se calcula al momento, no se lee de propietarios.SALDO:
      * una columna guardada no cambia por si sola cuando llega la fecha de un cargo programado
      * (ej. uno con fecha de manana), y quedaria desactualizada respecto a los reportes.
      *
@@ -47,17 +47,17 @@ class SaldoService
         $g = DB::getQueryGrammar();
 
         return Movimiento::query()
-            ->join('CONC1', 'CONC1.NUM_CPTO', '=', 'CUEN1.NUM_CPTO')
-            ->where('CUEN1.FECHA_APLI', '<=', $hasta)
-            ->groupBy('CUEN1.CLV_CLIE')
+            ->join('conceptos', 'conceptos.NUM_CPTO', '=', 'movimientos.NUM_CPTO')
+            ->where('movimientos.FECHA_APLI', '<=', $hasta)
+            ->groupBy('movimientos.CLV_CLIE')
             // wrap() pone las comillas correctas: en PostgreSQL las tablas/columnas en mayusculas
             // se crean entre comillas y sin ellas Postgres las busca en minusculas y falla.
             ->selectRaw(sprintf(
                 '%s as villa, SUM(CASE WHEN %s = true THEN %s ELSE -%s END) as saldo',
-                $g->wrap('CUEN1.CLV_CLIE'),
-                $g->wrap('CONC1.ES_CARGO'),
-                $g->wrap('CUEN1.IMPORTE'),
-                $g->wrap('CUEN1.IMPORTE'),
+                $g->wrap('movimientos.CLV_CLIE'),
+                $g->wrap('conceptos.ES_CARGO'),
+                $g->wrap('movimientos.IMPORTE'),
+                $g->wrap('movimientos.IMPORTE'),
             ))
             ->get()
             ->mapWithKeys(fn ($fila) => [$fila->villa => round((float) $fila->saldo, 2)]);

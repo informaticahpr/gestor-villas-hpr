@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class Villa extends Model
 {
-    protected $table = 'CLIE1';
+    protected $table = 'propietarios';
 
     protected $primaryKey = 'CLV_CLIE';
 

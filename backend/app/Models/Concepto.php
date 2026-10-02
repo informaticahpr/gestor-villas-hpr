@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['DESCR', 'ES_CARGO', 'ACTIVO', 'MONTO_DEFAULT'])]
 class Concepto extends Model
 {
-    protected $table = 'CONC1';
+    protected $table = 'conceptos';
 
     protected $primaryKey = 'NUM_CPTO';
 

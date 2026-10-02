@@ -206,7 +206,7 @@ class VillaController extends Controller
         ];
 
         if ($creando) {
-            $reglas['CLV_CLIE'] = ['required', 'string', 'max:5', 'unique:CLIE1,CLV_CLIE'];
+            $reglas['CLV_CLIE'] = ['required', 'string', 'max:5', 'unique:propietarios,CLV_CLIE'];
         }
 
         $mensajes = [

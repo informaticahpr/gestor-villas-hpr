@@ -141,7 +141,7 @@ class ReporteController extends Controller
     private function datosEstadoCuenta(Request $request): array
     {
         $data = $request->validate([
-            'villa' => ['nullable', 'string', 'exists:CLIE1,CLV_CLIE'],
+            'villa' => ['nullable', 'string', 'exists:propietarios,CLV_CLIE'],
             'desde' => ['required', 'date'],
             'hasta' => ['required', 'date', 'after_or_equal:desde'],
         ], [

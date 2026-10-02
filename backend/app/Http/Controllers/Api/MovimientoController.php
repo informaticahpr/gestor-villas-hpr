@@ -29,7 +29,7 @@ class MovimientoController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate([
-            'villa' => ['nullable', 'string', 'exists:CLIE1,CLV_CLIE'],
+            'villa' => ['nullable', 'string', 'exists:propietarios,CLV_CLIE'],
             'tipo' => ['nullable', 'in:cargo,credito'],
             'q' => ['nullable', 'string', 'max:40'],
             'desde' => ['nullable', 'date'],
@@ -90,8 +90,8 @@ class MovimientoController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'CLV_CLIE' => ['required', 'string', 'exists:CLIE1,CLV_CLIE'],
-            'NUM_CPTO' => ['required', 'integer', 'exists:CONC1,NUM_CPTO'],
+            'CLV_CLIE' => ['required', 'string', 'exists:propietarios,CLV_CLIE'],
+            'NUM_CPTO' => ['required', 'integer', 'exists:conceptos,NUM_CPTO'],
             'FORMA_PAGO_ID' => [
                 'nullable',
                 'integer',
@@ -155,7 +155,7 @@ class MovimientoController extends Controller
 
     /**
      * Aplica un mismo cargo (ej. la cuota mensual) a todas las villas que tengan
-     * activado "Aplicar cuota mensual" (CLIE1.APLICOBRO).
+     * activado "Aplicar cuota mensual" (propietarios.APLICOBRO).
      */
     public function aplicarATodas(Request $request)
     {
@@ -163,7 +163,7 @@ class MovimientoController extends Controller
             'NUM_CPTO' => [
                 'required',
                 'integer',
-                Rule::exists('CONC1', 'NUM_CPTO')->where('ES_CARGO', true),
+                Rule::exists('conceptos', 'NUM_CPTO')->where('ES_CARGO', true),
             ],
             'IMPORTE' => ['required', 'numeric', 'gt:0'],
             // igual que en store(): la fecha de aplicacion la fija el servidor, solo se elige el vencimiento
