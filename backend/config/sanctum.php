@@ -18,12 +18,22 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    // Ademas de SANCTUM_STATEFUL_DOMAINS se agrega siempre el dominio de FRONTEND_URL: asi, si se
+    // cambia el dominio del frontend (ej. en Railway) basta con actualizar FRONTEND_URL y el login
+    // sigue funcionando. Cada entrada se limpia de "https://" y "/" finales, que Sanctum no admite
+    // (con ellos la peticion no se reconoce como del frontend y el login falla con error 500).
+    'stateful' => array_values(array_unique(array_filter(array_map(
+        fn (string $dominio) => rtrim(preg_replace('#^https?://#', '', trim($dominio)), '/'),
+        [
+            ...explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
+                '%s%s',
+                'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
+                Sanctum::currentApplicationUrlWithPort(),
+                // Sanctum::currentRequestHost(),
+            ))),
+            (string) env('FRONTEND_URL', ''),
+        ],
+    )))),
 
     /*
     |--------------------------------------------------------------------------
