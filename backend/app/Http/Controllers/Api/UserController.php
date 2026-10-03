@@ -53,6 +53,8 @@ class UserController extends Controller
         $extra = ! empty($data['password']) ? ' y su contraseña' : '';
         Bitacora::registrar('usuario', 'editar', "Editó los datos{$extra} del usuario \"{$user->usuario}\" ({$user->name}).");
 
+        $this->mantenerSesionSiEsElMismo($request, $user);
+
         return response()->json(['user' => $this->serializar($user)]);
     }
 
@@ -104,6 +106,8 @@ class UserController extends Controller
 
         Bitacora::registrar('usuario', 'editar', "Cambió la contraseña del usuario \"{$user->name}\".");
 
+        $this->mantenerSesionSiEsElMismo($request, $user);
+
         return response()->json(status: 204);
     }
 
@@ -152,6 +156,19 @@ class UserController extends Controller
         Bitacora::registrar('usuario', 'eliminar', "Eliminó al usuario \"{$nombre}\".");
 
         return response()->json(status: 204);
+    }
+
+    /**
+     * Si el Administrador se edita a si mismo, la sesion pasa a usar sus datos nuevos. Sin esto, el
+     * middleware AuthenticateSession de Sanctum guarda en la sesion el hash de la contraseña ANTERIOR
+     * (la del usuario autenticado en memoria), y en la siguiente peticion lo saca por "Unauthenticated".
+     * A los demas usuarios si se les cierra la sesion al cambiarles la contraseña, como debe ser.
+     */
+    private function mantenerSesionSiEsElMismo(Request $request, User $user): void
+    {
+        if ($user->is($request->user())) {
+            auth()->guard('web')->setUser($user);
+        }
     }
 
     private function serializar(User $user): array

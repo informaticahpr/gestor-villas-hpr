@@ -117,11 +117,14 @@ async function guardarEdicionUsuario(u: Usuario) {
   try {
     const { data } = await api.put(`/api/usuarios/${u.id}`, formEditUsuario)
     u.name = data.user.name
+    u.usuario = data.user.usuario
     u.email = data.user.email
     u.rol = data.user.rol
     ordenarUsuarios()
     toast.success('Usuario actualizado correctamente.')
     editandoUsuario.value = null
+    // si se edito a si mismo, refresca el nombre/cargo que muestra el encabezado
+    if (u.id === auth.user?.id) await auth.fetchUser()
   } catch (e: any) {
     toast.error(mensajeDeError(e, 'No se pudo actualizar el usuario.'))
   } finally {
