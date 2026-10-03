@@ -28,8 +28,9 @@ class AuthController extends Controller
             'password.required' => 'Debes indicar tu contraseña.',
         ]);
 
-        // El nombre de usuario es el campo `name`; se compara sin distinguir mayúsculas.
-        $user = User::whereRaw('LOWER(name) = ?', [mb_strtolower(trim($credentials['usuario']))])->first();
+        // Se entra con el campo `usuario` (no con el nombre, que se puede cambiar libremente); se
+        // compara sin distinguir mayúsculas.
+        $user = User::whereRaw('LOWER(usuario) = ?', [mb_strtolower(trim($credentials['usuario']))])->first();
 
         // Hash::check() siempre se ejecuta (contra el hash real o, si el usuario no existe,
         // contra el señuelo) para no dar una pista de tiempo sobre si el usuario existe.
@@ -74,6 +75,7 @@ class AuthController extends Controller
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'usuario' => $user->usuario,
             'email' => $user->email,
             'rol' => $user->role?->nombre,
         ];

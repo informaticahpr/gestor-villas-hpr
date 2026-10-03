@@ -15,8 +15,12 @@ import type { VillaResumen, Concepto, FormaPago, RegistroBitacora, EntidadBitaco
 
 interface Usuario {
   id: number
+  /** Nombre para mostrar */
   name: string
-  email: string
+  /** Con el que inicia sesion */
+  usuario: string
+  email: string | null
+  /** Cargo */
   rol: string
   activo: boolean
 }
@@ -45,13 +49,19 @@ const mostrarFormUsuario = ref(false)
 
 const formUsuario = reactive({
   name: '',
+  usuario: '',
   email: '',
   password: '',
   rol: '',
 })
 
 const editandoUsuario = ref<number | null>(null)
-const formEditUsuario = reactive({ name: '', email: '', rol: '' })
+const formEditUsuario = reactive({ name: '', usuario: '', email: '', rol: '', password: '' })
+
+/** Usuario de inicio de sesion: minusculas, sin espacios ni acentos (igual que valida el servidor). */
+function filtrarUsuario(valor: string): string {
+  return valor.toLowerCase().replace(/[^a-z0-9._-]/g, '')
+}
 const accionEnCursoUsuario = ref<number | null>(null)
 
 function ordenarUsuarios() {
@@ -78,6 +88,7 @@ async function crearUsuario() {
     ordenarUsuarios()
     toast.success(`Usuario ${formUsuario.name} creado correctamente.`)
     formUsuario.name = ''
+    formUsuario.usuario = ''
     formUsuario.email = ''
     formUsuario.password = ''
     mostrarFormUsuario.value = false
@@ -91,8 +102,10 @@ async function crearUsuario() {
 function iniciarEdicionUsuario(u: Usuario) {
   editandoUsuario.value = u.id
   formEditUsuario.name = u.name
-  formEditUsuario.email = u.email
+  formEditUsuario.usuario = u.usuario
+  formEditUsuario.email = u.email ?? ''
   formEditUsuario.rol = u.rol
+  formEditUsuario.password = ''
 }
 
 function cancelarEdicionUsuario() {
@@ -684,21 +697,35 @@ onMounted(() => {
       <form v-if="mostrarFormUsuario && auth.esAdmin()" class="mb-6 grid grid-cols-2 gap-4 rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm" @submit.prevent="crearUsuario">
         <div>
           <label class="mb-1 block text-sm font-medium text-espresso-700">Nombre</label>
-          <input v-model="formUsuario.name" required class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+          <input v-model="formUsuario.name" required maxlength="100" placeholder="Juan Pérez" class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-espresso-700">Correo</label>
-          <input v-model="formUsuario.email" type="email" required class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+          <label class="mb-1 block text-sm font-medium text-espresso-700">Usuario</label>
+          <input
+            :value="formUsuario.usuario"
+            required
+            minlength="3"
+            maxlength="50"
+            autocomplete="off"
+            placeholder="jperez"
+            title="Con este usuario inicia sesión. Sin espacios ni acentos."
+            class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            @input="formUsuario.usuario = filtrarUsuario(($event.target as HTMLInputElement).value)"
+          />
         </div>
         <div>
-          <label class="mb-1 block text-sm font-medium text-espresso-700">Contraseña</label>
-          <input v-model="formUsuario.password" type="password" required minlength="8" class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
-        </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium text-espresso-700">Rol</label>
+          <label class="mb-1 block text-sm font-medium text-espresso-700">Cargo</label>
           <select v-model="formUsuario.rol" required class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
             <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
           </select>
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-espresso-700">Contraseña</label>
+          <input v-model="formUsuario.password" type="password" required minlength="8" autocomplete="new-password" class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-espresso-700">Correo <span class="font-normal text-espresso-800/45">(opcional)</span></label>
+          <input v-model="formUsuario.email" type="email" placeholder="jperez@gmail.com" class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
         </div>
         <div class="col-span-2">
           <button
@@ -716,8 +743,9 @@ onMounted(() => {
           <thead class="bg-brand-50/60">
             <tr>
               <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Nombre</th>
+              <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Usuario</th>
+              <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Cargo</th>
               <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Correo</th>
-              <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Rol</th>
               <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Estado</th>
               <th class="px-4 py-2.5"></th>
             </tr>
@@ -726,17 +754,37 @@ onMounted(() => {
             <tr v-for="u in usuarios" :key="u.id" class="hover:bg-brand-50/40">
               <template v-if="editandoUsuario === u.id">
                 <td class="px-4 py-2.5">
-                  <input v-model="formEditUsuario.name" required class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+                  <input v-model="formEditUsuario.name" required maxlength="100" title="Nombre" class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
                 </td>
                 <td class="px-4 py-2.5">
-                  <input v-model="formEditUsuario.email" type="email" required class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+                  <input
+                    :value="formEditUsuario.usuario"
+                    required
+                    maxlength="50"
+                    title="Usuario para iniciar sesión"
+                    class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    @input="formEditUsuario.usuario = filtrarUsuario(($event.target as HTMLInputElement).value)"
+                  />
                 </td>
                 <td class="px-4 py-2.5">
-                  <select v-model="formEditUsuario.rol" required class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+                  <select v-model="formEditUsuario.rol" required title="Cargo" class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
                     <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
                   </select>
                 </td>
-                <td class="px-4 py-2.5"></td>
+                <td class="px-4 py-2.5">
+                  <input v-model="formEditUsuario.email" type="email" placeholder="(opcional)" title="Correo" class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+                </td>
+                <td class="px-4 py-2.5">
+                  <input
+                    v-model="formEditUsuario.password"
+                    type="password"
+                    minlength="8"
+                    autocomplete="new-password"
+                    placeholder="Nueva contraseña"
+                    title="Déjala vacía para no cambiarla"
+                    class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                  />
+                </td>
                 <td class="px-4 py-2.5">
                   <div class="flex justify-end gap-1">
                     <button type="button" title="Guardar" :disabled="accionEnCursoUsuario === u.id" class="rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-40" @click="guardarEdicionUsuario(u)">
@@ -750,10 +798,11 @@ onMounted(() => {
               </template>
               <template v-else>
                 <td class="px-4 py-2.5 font-medium text-espresso-900">{{ u.name }}</td>
-                <td class="px-4 py-2.5 text-espresso-800/80">{{ u.email }}</td>
+                <td class="px-4 py-2.5 font-mono text-xs text-espresso-800/80">{{ u.usuario }}</td>
                 <td class="px-4 py-2.5">
                   <span class="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-800">{{ u.rol }}</span>
                 </td>
+                <td class="px-4 py-2.5 text-espresso-800/80">{{ u.email ?? '—' }}</td>
                 <td class="px-4 py-2.5">
                   <span class="rounded-full px-2.5 py-0.5 text-xs font-medium" :class="u.activo ? 'bg-brand-100 text-brand-800' : 'bg-espresso-800/10 text-espresso-800/50'">
                     {{ u.activo ? 'Activo' : 'Inactivo' }}
@@ -796,7 +845,7 @@ onMounted(() => {
               </template>
             </tr>
             <tr v-if="!cargandoUsuarios && usuarios.length === 0">
-              <td colspan="5" class="px-4 py-8 text-center text-espresso-800/40">Sin usuarios</td>
+              <td colspan="6" class="px-4 py-8 text-center text-espresso-800/40">Sin usuarios</td>
             </tr>
           </tbody>
         </table>

@@ -14,6 +14,7 @@ class UserSeeder extends Seeder
 
         User::create([
             'name' => 'Director',
+            'usuario' => 'director',
             'email' => 'director@hpr.test',
             'password' => 'passwd',
             'rol_id' => $roles[Role::DIRECTOR],
@@ -21,6 +22,7 @@ class UserSeeder extends Seeder
 
         User::create([
             'name' => 'Administrador',
+            'usuario' => 'administrador',
             'email' => 'admin@hpr.test',
             'password' => 'passwd',
             'rol_id' => $roles[Role::ADMIN],
@@ -28,6 +30,7 @@ class UserSeeder extends Seeder
 
         User::create([
             'name' => 'Supervisor',
+            'usuario' => 'supervisor',
             'email' => 'supervisor@hpr.test',
             'password' => 'passwd',
             'rol_id' => $roles[Role::SUPERVISOR],

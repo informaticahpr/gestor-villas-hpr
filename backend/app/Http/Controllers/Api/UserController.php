@@ -21,67 +21,74 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('users', 'name')->whereNull('deleted_at')],
-            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
-            'rol' => ['required', 'string', 'exists:roles,nombre'],
-        ], [
-            'name.required' => 'Debes indicar el nombre del usuario.',
-            'name.max' => 'El nombre no puede superar los 100 caracteres.',
-            'name.unique' => 'Ya existe un usuario con ese nombre. Se usa para iniciar sesión.',
-            'email.required' => 'Debes indicar el correo electrónico.',
-            'email.email' => 'El correo electrónico no tiene un formato válido.',
-            'email.unique' => 'Ya existe un usuario registrado con ese correo.',
-            'password.required' => 'Debes indicar una contraseña.',
-            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
-            'rol.required' => 'Debes seleccionar un rol.',
-            'rol.exists' => 'El rol seleccionado no es válido.',
-        ]);
-
-        $rolId = Role::where('nombre', $data['rol'])->value('id');
+        $data = $this->validar($request);
 
         $user = User::create([
             'name' => $data['name'],
-            'email' => $data['email'],
+            'usuario' => $data['usuario'],
+            'email' => $data['email'] ?? null,
             'password' => $data['password'],
-            'rol_id' => $rolId,
+            'rol_id' => Role::where('nombre', $data['rol'])->value('id'),
             'activo' => true,
         ]);
 
-        Bitacora::registrar('usuario', 'crear', "Creó al usuario \"{$user->name}\" ({$data['rol']}).");
+        Bitacora::registrar('usuario', 'crear', "Creó al usuario \"{$user->usuario}\" ({$user->name}, {$data['rol']}).");
 
         return response()->json(['user' => $this->serializar($user)], 201);
     }
 
+    /** El Administrador puede cambiar nombre, usuario, cargo, correo y -- si la escribe -- la contraseña. */
     public function update(Request $request, User $user)
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('users', 'name')->ignore($user->id)->whereNull('deleted_at')],
-            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user->id)],
-            'rol' => ['required', 'string', 'exists:roles,nombre'],
-        ], [
-            'name.required' => 'Debes indicar el nombre del usuario.',
-            'name.max' => 'El nombre no puede superar los 100 caracteres.',
-            'name.unique' => 'Ya existe un usuario con ese nombre. Se usa para iniciar sesión.',
-            'email.required' => 'Debes indicar el correo electrónico.',
-            'email.email' => 'El correo electrónico no tiene un formato válido.',
-            'email.unique' => 'Ya existe un usuario registrado con ese correo.',
-            'rol.required' => 'Debes seleccionar un rol.',
-            'rol.exists' => 'El rol seleccionado no es válido.',
-        ]);
-
-        $rolId = Role::where('nombre', $data['rol'])->value('id');
+        $data = $this->validar($request, $user);
 
         $user->update([
             'name' => $data['name'],
-            'email' => $data['email'],
-            'rol_id' => $rolId,
+            'usuario' => $data['usuario'],
+            'email' => $data['email'] ?? null,
+            'rol_id' => Role::where('nombre', $data['rol'])->value('id'),
+            ...(! empty($data['password']) ? ['password' => $data['password']] : []),
         ]);
 
-        Bitacora::registrar('usuario', 'editar', "Editó al usuario \"{$user->name}\".");
+        $extra = ! empty($data['password']) ? ' y su contraseña' : '';
+        Bitacora::registrar('usuario', 'editar', "Editó los datos{$extra} del usuario \"{$user->usuario}\" ({$user->name}).");
 
         return response()->json(['user' => $this->serializar($user)]);
+    }
+
+    /**
+     * Nombre (para mostrar), usuario (para iniciar sesion), cargo y correo opcional. La contrasena es
+     * obligatoria al crear; al editar es opcional (vacia = no se cambia).
+     */
+    private function validar(Request $request, ?User $user = null): array
+    {
+        if ($request->filled('usuario')) {
+            $request->merge(['usuario' => mb_strtolower(trim($request->input('usuario')), 'UTF-8')]);
+        }
+
+        $unico = fn (string $columna) => Rule::unique('users', $columna)->ignore($user?->id)->whereNull('deleted_at');
+
+        return $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'usuario' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[a-z0-9._-]+$/', $unico('usuario')],
+            'email' => ['nullable', 'email', 'max:150', $unico('email')],
+            'password' => [$user ? 'nullable' : 'required', 'string', 'min:8'],
+            'rol' => ['required', 'string', 'exists:roles,nombre'],
+        ], [
+            'name.required' => 'Debes indicar el nombre.',
+            'name.max' => 'El nombre no puede superar los 100 caracteres.',
+            'usuario.required' => 'Debes indicar el usuario con el que iniciará sesión.',
+            'usuario.min' => 'El usuario debe tener al menos 3 caracteres.',
+            'usuario.max' => 'El usuario no puede superar los 50 caracteres.',
+            'usuario.regex' => 'El usuario solo puede tener letras sin acentos, números, punto, guion y guion bajo (sin espacios).',
+            'usuario.unique' => 'Ya existe otro usuario con ese nombre de usuario.',
+            'email.email' => 'El correo electrónico no tiene un formato válido.',
+            'email.unique' => 'Ya existe un usuario registrado con ese correo.',
+            'password.required' => 'Debes indicar una contraseña.',
+            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
+            'rol.required' => 'Debes seleccionar un cargo.',
+            'rol.exists' => 'El cargo seleccionado no es válido.',
+        ]);
     }
 
     public function cambiarPassword(Request $request, User $user)
@@ -152,6 +159,7 @@ class UserController extends Controller
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'usuario' => $user->usuario,
             'email' => $user->email,
             'rol' => $user->role?->nombre,
             'activo' => (bool) $user->activo,
