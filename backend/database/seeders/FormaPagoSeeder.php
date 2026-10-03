@@ -9,7 +9,7 @@ class FormaPagoSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach (['Efectivo', 'Transferencia', 'Depósito', 'Cheque', 'Otro'] as $nombre) {
+        foreach (['Efectivo', 'Transferencia', 'Depósito', 'Cheque'] as $nombre) {
             FormaPago::firstOrCreate(['nombre' => $nombre]);
         }
     }
