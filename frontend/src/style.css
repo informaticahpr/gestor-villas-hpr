@@ -48,3 +48,10 @@ input[type='number']::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* Al consultar un registro guardado (formulario en solo lectura: <fieldset disabled>) los campos
+   vacios no muestran el texto de ejemplo; los placeholders solo se ven al capturar o editar. */
+fieldset:disabled input::placeholder,
+fieldset:disabled textarea::placeholder {
+  color: transparent;
+}

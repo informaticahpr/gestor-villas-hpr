@@ -59,6 +59,8 @@ function aceptar() {
   if (!d) return
   if (d.tipo === 'confirmar') {
     dialog.cerrar(true)
+  } else if (d.tipo === 'elegir') {
+    dialog.cerrar((d.opciones.find((o) => o.principal) ?? d.opciones[0]).valor)
   } else if (passwordValido.value) {
     dialog.cerrar(password.value)
   }
@@ -105,7 +107,7 @@ function aceptar() {
         </template>
       </div>
 
-      <div class="flex justify-end gap-2 rounded-b-2xl border-t border-gold-300/30 px-6 py-4">
+      <div class="flex flex-wrap justify-end gap-2 rounded-b-2xl border-t border-gold-300/30 px-6 py-4">
         <button
           type="button"
           class="rounded-lg px-4 py-2 text-sm font-medium text-espresso-700 hover:bg-espresso-800/5"
@@ -113,7 +115,24 @@ function aceptar() {
         >
           Cancelar
         </button>
+        <template v-if="dialog.activo.tipo === 'elegir'">
+          <button
+            v-for="o in dialog.activo.opciones"
+            :key="o.valor"
+            type="button"
+            class="rounded-lg px-4 py-2 text-sm font-semibold transition"
+            :class="
+              o.principal
+                ? 'bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 text-white shadow-sm hover:opacity-90'
+                : 'border border-espresso-800/20 text-espresso-700 hover:bg-brand-50'
+            "
+            @click="dialog.cerrar(o.valor)"
+          >
+            {{ o.texto }}
+          </button>
+        </template>
         <button
+          v-else
           ref="botonConfirmar"
           type="submit"
           :disabled="dialog.activo.tipo === 'password' && !passwordValido"

@@ -14,9 +14,17 @@ export interface OpcionesPassword {
   mensaje: string
 }
 
+/** Pregunta con varias respuestas posibles (ademas de Cancelar). */
+export interface OpcionesElegir {
+  titulo: string
+  mensaje: string
+  opciones: { valor: string; texto: string; principal?: boolean }[]
+}
+
 export type DialogoActivo =
   | ({ tipo: 'confirmar' } & OpcionesConfirmar & { resolver: (ok: boolean) => void })
   | ({ tipo: 'password' } & OpcionesPassword & { resolver: (password: string | null) => void })
+  | ({ tipo: 'elegir' } & OpcionesElegir & { resolver: (valor: string | null) => void })
 
 /**
  * Reemplaza los confirm()/prompt() nativos del navegador por modales propios.
@@ -47,6 +55,14 @@ export const useDialogStore = defineStore('dialog', () => {
     })
   }
 
+  /** Devuelve el `valor` de la opcion elegida, o null si se cancela. */
+  function elegir(opciones: OpcionesElegir): Promise<string | null> {
+    cancelarActivo()
+    return new Promise((resolver) => {
+      activo.value = { tipo: 'elegir', ...opciones, resolver }
+    })
+  }
+
   function cerrar(valor: boolean | string | null) {
     const d = activo.value
     if (!d) return
@@ -55,5 +71,5 @@ export const useDialogStore = defineStore('dialog', () => {
     else d.resolver(typeof valor === 'string' ? valor : null)
   }
 
-  return { activo, confirmar, pedirPassword, cerrar }
+  return { activo, confirmar, pedirPassword, elegir, cerrar }
 })

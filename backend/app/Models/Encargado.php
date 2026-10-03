@@ -7,12 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Persona que atiende la villa en nombre del propietario (opcional, uno por villa). */
-#[Fillable(['CLV_CLIE', 'NOMBRES', 'APELLIDOS', 'DNI', 'TELF', 'CELULAR', 'OTRO_TEL', 'MAIL', 'MAIL2', 'FECHA_NAC'])]
+#[Fillable(['CLV_CLIE', 'NOMBRES', 'APELLIDOS', 'DNI', 'PARENTESCO', 'TELF', 'CELULAR', 'OTRO_TEL', 'MAIL', 'MAIL2', 'FECHA_NAC'])]
 class Encargado extends Model
 {
     protected $table = 'encargados';
 
-    public const CAMPOS = ['NOMBRES', 'APELLIDOS', 'DNI', 'TELF', 'CELULAR', 'OTRO_TEL', 'MAIL', 'MAIL2', 'FECHA_NAC'];
+    public const CAMPOS = ['NOMBRES', 'APELLIDOS', 'DNI', 'PARENTESCO', 'TELF', 'CELULAR', 'OTRO_TEL', 'MAIL', 'MAIL2', 'FECHA_NAC'];
 
     protected function casts(): array
     {

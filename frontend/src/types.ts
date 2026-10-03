@@ -22,6 +22,8 @@ export interface DatosPersona {
   MAIL2: string | null
   /** AAAA-MM-DD */
   FECHA_NAC: string | null
+  /** Solo el encargado: parentesco o vinculo con el propietario */
+  PARENTESCO?: string | null
 }
 
 export interface Propietario extends DatosPersona {
@@ -45,6 +47,27 @@ export interface DatosVilla {
   APLICOBRO: boolean
   CUOTA_ESPECIAL: boolean
   MONTO_CUOTA_ESPECIAL: number | null
+}
+
+/** Propietario o encargado anterior: sus datos tal como estaban cuando dejo de serlo. */
+export interface PersonaAnterior extends DatosPersona {
+  id: number
+  tipo: 'propietario' | 'encargado'
+  nombre_completo: string
+  /** AAAA-MM-DD; null si no se sabe desde cuando */
+  desde: string | null
+  /** AAAA-MM-DD: fecha del cambio */
+  hasta: string
+  /** Usuario que hizo el cambio */
+  registrado_por: string | null
+}
+
+/** Pestaña "Historial de Villa" */
+export interface HistorialVilla {
+  propietario_desde: string | null
+  encargado_desde: string | null
+  propietarios: PersonaAnterior[]
+  encargados: PersonaAnterior[]
 }
 
 export interface VillaDetalle {

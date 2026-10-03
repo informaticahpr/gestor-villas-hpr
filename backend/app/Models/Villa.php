@@ -62,6 +62,12 @@ class Villa extends Model
         return $this->hasOne(Encargado::class, 'CLV_CLIE', 'CLV_CLIE');
     }
 
+    /** Propietarios y encargados anteriores (ver VillaHistorial). */
+    public function historial(): HasMany
+    {
+        return $this->hasMany(VillaHistorial::class, 'CLV_CLIE', 'CLV_CLIE');
+    }
+
     public function movimientos(): HasMany
     {
         return $this->hasMany(Movimiento::class, 'CLV_CLIE', 'CLV_CLIE');

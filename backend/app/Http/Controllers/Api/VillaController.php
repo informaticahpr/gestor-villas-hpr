@@ -9,6 +9,7 @@ use App\Models\Encargado;
 use App\Models\Propietario;
 use App\Models\Role;
 use App\Models\Villa;
+use App\Models\VillaHistorial;
 use App\Services\SaldoService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -58,7 +59,34 @@ class VillaController extends Controller
             'villa' => $this->detalle($villa),
             'estado_cuenta' => $this->saldoService->estadoDeCuenta($villa, $desde, $hasta),
             'periodo' => ['desde' => $desde->toDateString(), 'hasta' => $hasta->toDateString()],
+            'historial' => $this->historial($villa),
         ]);
+    }
+
+    /**
+     * Pestaña "Historial de Villa": desde cuando estan el propietario y el encargado actuales, y los
+     * anteriores (del cambio mas reciente al mas antiguo) con sus datos tal como estaban registrados.
+     */
+    private function historial(Villa $villa): array
+    {
+        $anteriores = $villa->historial()->with('usuario')->orderByDesc('HASTA')->orderByDesc('id')->get()
+            ->map(fn (VillaHistorial $h) => [
+                'id' => $h->id,
+                'tipo' => $h->TIPO,
+                'nombre_completo' => $h->nombre_completo,
+                ...$h->only(['NOMBRES', 'APELLIDOS', 'DNI', 'PARENTESCO', 'TELF', 'CELULAR', 'OTRO_TEL', 'MAIL', 'MAIL2']),
+                'FECHA_NAC' => $h->FECHA_NAC?->toDateString(),
+                'desde' => $h->DESDE?->toDateString(),
+                'hasta' => $h->HASTA->toDateString(),
+                'registrado_por' => $h->usuario?->name,
+            ]);
+
+        return [
+            'propietario_desde' => $this->propietarioDesde($villa)?->toDateString(),
+            'encargado_desde' => $villa->encargado?->created_at?->toDateString(),
+            'propietarios' => $anteriores->where('tipo', VillaHistorial::PROPIETARIO)->values(),
+            'encargados' => $anteriores->where('tipo', VillaHistorial::ENCARGADO)->values(),
+        ];
     }
 
     /**
@@ -83,20 +111,77 @@ class VillaController extends Controller
         return response()->json(['villa' => $this->detalle($villa->refresh())], 201);
     }
 
-    /** Solo Director/Admin (ver routes/api.php). */
+    /**
+     * Solo Director/Admin (ver routes/api.php). Si la villa cambia de propietario o de encargado, el
+     * que sale queda guardado en el historial de la villa con sus datos tal como estaban.
+     */
     public function update(Request $request, string $villa)
     {
-        $villa = Villa::findOrFail($villa);
+        $villa = Villa::with(['propietario', 'encargado'])->findOrFail($villa);
         $data = $this->validated($request, creando: false);
+        $usuarioId = $request->user()->id;
 
-        DB::transaction(function () use ($villa, $data) {
+        DB::transaction(function () use ($villa, $data, $usuarioId) {
+            // "fotos" de quienes estaban antes del cambio (antes de guardar, por si se editan sus datos)
+            $propietarioAntes = $villa->propietario;
+            $datosPropietarioAntes = $propietarioAntes?->only(Encargado::CAMPOS);
+            $encargadoAntes = $villa->encargado;
+
             $propietario = $this->guardarPropietario($data['propietario'], puedeEditarExistente: true);
-
             $villa->update($data['villa'] + ['PROPIETARIO_ID' => $propietario->id]);
+
+            if ($propietarioAntes && $propietarioAntes->id !== $propietario->id) {
+                $this->registrarEnHistorial($villa, VillaHistorial::PROPIETARIO, $datosPropietarioAntes, $usuarioId,
+                    desde: $this->propietarioDesde($villa), propietarioId: $propietarioAntes->id);
+            }
+
+            $encargadoNuevo = array_intersect_key($data['encargado'], array_flip(Encargado::CAMPOS));
+            $hayEncargadoNuevo = collect($encargadoNuevo)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
+
+            if ($encargadoAntes && (! $hayEncargadoNuevo || $this->esOtraPersona($encargadoAntes->only(Encargado::CAMPOS), $encargadoNuevo))) {
+                $this->registrarEnHistorial($villa, VillaHistorial::ENCARGADO, $encargadoAntes->only(Encargado::CAMPOS), $usuarioId,
+                    desde: $encargadoAntes->created_at);
+                // se borra para que el nuevo encargado tenga su propia fecha de inicio (created_at)
+                $encargadoAntes->delete();
+            }
+
             $this->guardarEncargado($villa, $data['encargado']);
         });
 
         return response()->json(['villa' => $this->detalle($villa->refresh())]);
+    }
+
+    private function registrarEnHistorial(Villa $villa, string $tipo, array $datos, int $usuarioId, $desde, ?int $propietarioId = null): void
+    {
+        VillaHistorial::create($datos + [
+            'CLV_CLIE' => $villa->CLV_CLIE,
+            'TIPO' => $tipo,
+            'PROPIETARIO_ID' => $propietarioId,
+            'DESDE' => $desde ? Carbon::parse($desde)->toDateString() : null,
+            'HASTA' => Carbon::today()->toDateString(),
+            'USUARIO_ID' => $usuarioId,
+        ]);
+    }
+
+    /** Desde cuando el propietario actual lo es: el ultimo cambio registrado o, si no hay, el alta de la villa. */
+    private function propietarioDesde(Villa $villa): ?Carbon
+    {
+        $ultimoCambio = $villa->historial()->where('TIPO', VillaHistorial::PROPIETARIO)->max('HASTA');
+
+        return $ultimoCambio ? Carbon::parse($ultimoCambio) : $villa->created_at;
+    }
+
+    /**
+     * Distinto encargado = otro nombre u otro DNI. Cambiarle solo el celular o el correo a la misma
+     * persona no cuenta como cambio de encargado.
+     */
+    private function esOtraPersona(array $antes, array $nuevo): bool
+    {
+        $nombre = fn (array $p) => mb_strtoupper(trim(($p['NOMBRES'] ?? '').' '.($p['APELLIDOS'] ?? '')), 'UTF-8');
+        $dniAntes = trim((string) ($antes['DNI'] ?? ''));
+        $dniNuevo = trim((string) ($nuevo['DNI'] ?? ''));
+
+        return $nombre($antes) !== $nombre($nuevo) || ($dniAntes !== '' && $dniNuevo !== '' && $dniAntes !== $dniNuevo);
     }
 
     /**
@@ -231,6 +316,7 @@ class VillaController extends Controller
             'encargado.MAIL' => ['nullable', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO],
             'encargado.MAIL2' => ['nullable', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO],
             'encargado.FECHA_NAC' => ['nullable', 'date'],
+            'encargado.PARENTESCO' => ['nullable', 'string', 'max:60'],
 
             // --- Datos de Villa ---
             'villa' => ['required', 'array'],
@@ -259,6 +345,7 @@ class VillaController extends Controller
             'propietario.TELF.required_without_all' => 'Debes indicar al menos un teléfono del propietario (Celular 1, Celular 2 u Otro).',
             'propietario.MAIL.required_without' => 'Debes indicar al menos un correo del propietario (Correo Electrónico 1 o 2).',
             'propietario.DNI.unique' => 'Ya hay otro propietario con ese DNI/Pasaporte. Búscalo en "Propietario ya registrado".',
+            'encargado.PARENTESCO.max' => 'El parentesco/vínculo del encargado no puede superar los 60 caracteres.',
             'villa.DIR.required' => 'Debes indicar la ubicación de la villa.',
             'villa.DIR.max' => 'La ubicación no puede superar los 255 caracteres.',
             'villa.FCONTRUC.required' => 'Debes indicar la fecha de entrega de la villa.',
@@ -299,7 +386,7 @@ class VillaController extends Controller
         $minus = fn (?string $v) => $v === null ? null : (mb_strtolower(trim($v), 'UTF-8') ?: null);
 
         $normalizarPersona = function (array $p) use ($mayus, $minus): array {
-            foreach (['NOMBRES', 'APELLIDOS', 'DNI'] as $c) {
+            foreach (['NOMBRES', 'APELLIDOS', 'DNI', 'PARENTESCO'] as $c) {
                 if (array_key_exists($c, $p)) {
                     $p[$c] = $mayus($p[$c]);
                 }

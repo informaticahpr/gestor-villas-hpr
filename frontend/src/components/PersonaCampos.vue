@@ -20,8 +20,12 @@ const props = defineProps<{
     MAIL: string
     MAIL2: string
     FECHA_NAC: string
+    /** Solo el encargado: parentesco o vinculo con el propietario */
+    PARENTESCO?: string
   }
   requerido?: boolean
+  /** Muestra el campo "Parentesco / Vínculo" (solo encargado) */
+  conParentesco?: boolean
   /** "del propietario" / "del encargado", para la etiqueta de fecha de nacimiento */
   de: string
 }>()
@@ -47,6 +51,10 @@ function valor(e: Event): string {
       <div>
         <label :class="claseLabel">Apellidos<span v-if="requerido" class="text-wine-500"> *</span></label>
         <input :value="p.APELLIDOS" maxlength="60" placeholder="SÁNCHEZ" title="Solo letras" :class="claseInput" @input="p.APELLIDOS = soloLetras(valor($event))" />
+      </div>
+      <div v-if="conParentesco" class="sm:col-span-2">
+        <label :class="claseLabel">Parentesco / Vínculo</label>
+        <input :value="p.PARENTESCO" maxlength="60" placeholder="HERMANO, ADMINISTRADOR, AMIGO..." :class="claseInput" @input="p.PARENTESCO = mayusculas(valor($event))" />
       </div>
       <div>
         <label :class="claseLabel">DNI / Pasaporte</label>
