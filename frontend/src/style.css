@@ -37,3 +37,14 @@ body {
   background-color: var(--color-cream-100);
   color: var(--color-espresso-800);
 }
+
+/* Sin flechitas (spinners) en los campos numericos: se escribe el numero directamente. */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

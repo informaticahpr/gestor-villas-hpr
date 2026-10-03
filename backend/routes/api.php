@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FormaPagoController;
 use App\Http\Controllers\Api\HoyController;
 use App\Http\Controllers\Api\MovimientoController;
+use App\Http\Controllers\Api\PropietarioController;
 use App\Http\Controllers\Api\ReciboController;
 use App\Http\Controllers\Api\ReporteController;
 use App\Http\Controllers\Api\UserController;
@@ -25,6 +26,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/villas', [VillaController::class, 'index']);
     Route::get('/villas/{villa}', [VillaController::class, 'show']);
     Route::post('/villas', [VillaController::class, 'store']);
+
+    Route::get('/propietarios', [PropietarioController::class, 'index']);
 
     Route::get('/conceptos', [ConceptoController::class, 'index']);
 

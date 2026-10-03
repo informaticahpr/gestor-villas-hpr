@@ -31,7 +31,7 @@ class MovimientoController extends Controller
     public function index(Request $request)
     {
         $data = $request->validate([
-            'villa' => ['nullable', 'string', 'exists:propietarios,CLV_CLIE'],
+            'villa' => ['nullable', 'string', 'exists:villas,CLV_CLIE'],
             'tipo' => ['nullable', 'in:cargo,credito'],
             'q' => ['nullable', 'string', 'max:40'],
             'desde' => ['nullable', 'date'],
@@ -98,7 +98,7 @@ class MovimientoController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'CLV_CLIE' => ['required', 'string', 'exists:propietarios,CLV_CLIE'],
+            'CLV_CLIE' => ['required', 'string', 'exists:villas,CLV_CLIE'],
             'NUM_CPTO' => ['required', 'integer', 'exists:conceptos,NUM_CPTO'],
             'FORMA_PAGO_ID' => [
                 'nullable',
@@ -163,7 +163,7 @@ class MovimientoController extends Controller
 
     /**
      * Aplica un mismo cargo (ej. la cuota mensual) a todas las villas que tengan
-     * activado "Aplicar cuota mensual" (propietarios.APLICOBRO).
+     * activado "Aplicar cuota mensual" (villas.APLICOBRO).
      */
     public function aplicarATodas(Request $request)
     {

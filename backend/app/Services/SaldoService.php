@@ -34,7 +34,7 @@ class SaldoService
      * Saldo de todas las villas a la fecha dada (por defecto, hoy) en una sola consulta:
      * [CLV_CLIE => saldo]. Las villas sin movimientos no aparecen (su saldo es 0).
      *
-     * Es el saldo que muestran las pantallas y se calcula al momento, no se lee de propietarios.SALDO:
+     * Es el saldo que muestran las pantallas y se calcula al momento, no se lee de villas.SALDO:
      * una columna guardada no cambia por si sola cuando llega la fecha de un cargo programado
      * (ej. uno con fecha de manana), y quedaria desactualizada respecto a los reportes.
      *

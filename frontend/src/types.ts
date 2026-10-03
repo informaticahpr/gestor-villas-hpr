@@ -7,24 +7,52 @@ export interface VillaResumen {
   monto_cuota_especial: number | null
 }
 
-export interface VillaDetalle {
-  CLV_CLIE: string
-  NOMBRES: string
-  APELLIDOS: string
-  DIR: string | null
+/** Datos de una persona: los del propietario y los del encargado tienen la misma forma. */
+export interface DatosPersona {
+  NOMBRES: string | null
+  APELLIDOS: string | null
+  /** DNI o pasaporte */
+  DNI: string | null
+  /** Celular 1 */
   TELF: string | null
+  /** Celular 2 */
   CELULAR: string | null
   OTRO_TEL: string | null
   MAIL: string | null
   MAIL2: string | null
-  FCONTRUC: string | null
-  NOMED: string | null
+  /** AAAA-MM-DD */
   FECHA_NAC: string | null
+}
+
+export interface Propietario extends DatosPersona {
+  id: number
+  nombre_completo: string
+  /** Numeros de las villas que tiene este propietario */
+  villas: string[]
+}
+
+export interface DatosVilla {
+  /** Ubicacion, ej. "BLOQUE A" */
+  DIR: string | null
+  /** Fecha de entrega, AAAA-MM-DD */
+  FCONTRUC: string | null
+  /** Medidor ENEE */
+  NOMED: string | null
+  CLAVE_CATASTRAL: string | null
+  DESCRIPCION_IP: string | null
   NOHAB: number | null
   NOBATH: number | null
   APLICOBRO: boolean
   CUOTA_ESPECIAL: boolean
   MONTO_CUOTA_ESPECIAL: number | null
+}
+
+export interface VillaDetalle {
+  CLV_CLIE: string
+  villa: DatosVilla
+  propietario: Propietario | null
+  /** null si la villa no tiene encargado */
+  encargado: DatosPersona | null
   SALDO: number
 }
 

@@ -2,16 +2,23 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\BuscaSinAcentos;
 use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
+use App\Models\Encargado;
+use App\Models\Propietario;
+use App\Models\Role;
 use App\Models\Villa;
 use App\Services\SaldoService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class VillaController extends Controller
 {
+    use BuscaSinAcentos;
+
     public function __construct(private readonly SaldoService $saldoService) {}
 
     public function index(Request $request)
@@ -23,8 +30,9 @@ class VillaController extends Controller
             ->when($q !== '', function ($query) use ($q, $qClave) {
                 $query->where(function ($sub) use ($q, $qClave) {
                     $sub->whereRaw($this->columnaClave('CLV_CLIE').' LIKE ?', ["%{$qClave}%"])
-                        ->orWhereRaw($this->columnaSinAcentos('NOMBRES').' LIKE ?', ["%{$q}%"])
-                        ->orWhereRaw($this->columnaSinAcentos('APELLIDOS').' LIKE ?', ["%{$q}%"]);
+                        ->orWhereHas('propietario', fn ($p) => $p
+                            ->whereRaw($this->columnaSinAcentos('NOMBRES').' LIKE ?', ["%{$q}%"])
+                            ->orWhereRaw($this->columnaSinAcentos('APELLIDOS').' LIKE ?', ["%{$q}%"]));
                 })->limit(8);
             })
             ->when($request->boolean('cuota_especial'), fn ($query) => $query->where('CUOTA_ESPECIAL', true))
@@ -36,44 +44,6 @@ class VillaController extends Controller
         return response()->json([
             'data' => $villas->map(fn (Villa $v) => $this->resumen($v, $saldos->get($v->CLV_CLIE, 0.0))),
         ]);
-    }
-
-    /**
-     * Mapa de vocales/eñe acentuadas -> su forma simple, para que la busqueda
-     * encuentre "Sanchez" aunque el nombre real este guardado como "Sánchez".
-     */
-    private const MAPA_ACENTOS = [
-        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u', 'ñ' => 'n',
-        'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u', 'Ñ' => 'n',
-    ];
-
-    private function sinAcentos(string $texto): string
-    {
-        return strtolower(strtr($texto, self::MAPA_ACENTOS));
-    }
-
-    /**
-     * Expresion SQL que aplica el mismo mapa de acentos a una columna, para
-     * poder comparar contra un termino de busqueda ya normalizado.
-     */
-    private function columnaSinAcentos(string $columna): string
-    {
-        $expr = 'LOWER('.DB::getQueryGrammar()->wrap($columna).')';
-        foreach (self::MAPA_ACENTOS as $con => $sin) {
-            $expr = "REPLACE({$expr}, '{$con}', '{$sin}')";
-        }
-
-        return $expr;
-    }
-
-    /**
-     * Igual que columnaSinAcentos(), pero ademas le quita los guiones a la
-     * columna -- asi "A-1" hace match si el usuario busca "A1" sin guion.
-     * Se usa solo para CLV_CLIE (codigo de villa), no para nombres.
-     */
-    private function columnaClave(string $columna): string
-    {
-        return "REPLACE(".$this->columnaSinAcentos($columna).", '-', '')";
     }
 
     public function show(string $villa)
@@ -91,23 +61,77 @@ class VillaController extends Controller
         ]);
     }
 
+    /**
+     * Crea la villa con su propietario (uno nuevo, o uno ya registrado si llega propietario.id) y,
+     * si se llenó algún dato, su encargado. Cualquier usuario puede crear villas; solo Director/Admin
+     * pueden modificar los datos de un propietario ya registrado (el Supervisor solo lo vincula).
+     */
     public function store(Request $request)
     {
         $data = $this->validated($request, creando: true);
+        $puedeEditarPropietario = in_array($request->user()->role?->nombre, [Role::DIRECTOR, Role::ADMIN], true);
 
-        $villa = Villa::create($data + ['SALDO' => 0]);
+        $villa = DB::transaction(function () use ($data, $puedeEditarPropietario) {
+            $propietario = $this->guardarPropietario($data['propietario'], $puedeEditarPropietario);
 
-        return response()->json(['villa' => $this->detalle($villa)], 201);
+            $villa = Villa::create($data['villa'] + ['PROPIETARIO_ID' => $propietario->id, 'SALDO' => 0]);
+            $this->guardarEncargado($villa, $data['encargado']);
+
+            return $villa;
+        });
+
+        return response()->json(['villa' => $this->detalle($villa->refresh())], 201);
     }
 
+    /** Solo Director/Admin (ver routes/api.php). */
     public function update(Request $request, string $villa)
     {
         $villa = Villa::findOrFail($villa);
         $data = $this->validated($request, creando: false);
 
-        $villa->update($data);
+        DB::transaction(function () use ($villa, $data) {
+            $propietario = $this->guardarPropietario($data['propietario'], puedeEditarExistente: true);
+
+            $villa->update($data['villa'] + ['PROPIETARIO_ID' => $propietario->id]);
+            $this->guardarEncargado($villa, $data['encargado']);
+        });
 
         return response()->json(['villa' => $this->detalle($villa->refresh())]);
+    }
+
+    /**
+     * Con id: usa ese propietario (y actualiza sus datos si se permite -- el cambio aplica a todas
+     * sus villas). Sin id: crea uno nuevo.
+     */
+    private function guardarPropietario(array $datos, bool $puedeEditarExistente): Propietario
+    {
+        $id = $datos['id'] ?? null;
+        unset($datos['id']);
+
+        if (! $id) {
+            return Propietario::create($datos);
+        }
+
+        $propietario = Propietario::findOrFail($id);
+        if ($puedeEditarExistente) {
+            $propietario->update($datos);
+        }
+
+        return $propietario;
+    }
+
+    /** El encargado es opcional: si todos sus campos llegan vacíos, se elimina (o no se crea). */
+    private function guardarEncargado(Villa $villa, array $datos): void
+    {
+        $datos = array_intersect_key($datos, array_flip(Encargado::CAMPOS));
+
+        if (collect($datos)->filter(fn ($v) => $v !== null && $v !== '')->isEmpty()) {
+            $villa->encargado()->delete();
+
+            return;
+        }
+
+        Encargado::updateOrCreate(['CLV_CLIE' => $villa->CLV_CLIE], $datos);
     }
 
     /**
@@ -157,7 +181,7 @@ class VillaController extends Controller
     private const REGEX_SOLO_LETRAS = 'regex:/^[\pL\s]+$/u';
 
     /**
-     * Solo digitos, con guiones/espacios opcionales para el formato "2234-5601".
+     * Solo digitos, con guiones/espacios opcionales para el formato "9897-2123".
      */
     private const REGEX_SOLO_NUMEROS = 'regex:/^[0-9][0-9\-\s]*$/';
 
@@ -167,82 +191,142 @@ class VillaController extends Controller
      */
     private const REGEX_CORREO_CON_DOMINIO = 'regex:/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/';
 
+    /**
+     * Valida el formulario de villa, que llega como
+     * { CLV_CLIE, propietario: {id?, ...}, encargado: {...}, villa: {...} }
+     * y se devuelve con esas tres secciones listas para guardar.
+     */
     private function validated(Request $request, bool $creando): array
     {
         if ($request->filled('CLV_CLIE')) {
             $request->merge(['CLV_CLIE' => mb_strtoupper($request->input('CLV_CLIE'), 'UTF-8')]);
         }
 
+        $propietarioId = $request->input('propietario.id');
+
         $reglas = [
-            'NOMBRES' => ['required', 'string', 'max:60', self::REGEX_SOLO_LETRAS],
-            'APELLIDOS' => ['required', 'string', 'max:60', self::REGEX_SOLO_LETRAS],
-            'DIR' => ['required', 'string', 'max:255'],
-            'TELF' => [
-                'nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS,
-                function (string $attribute, mixed $value, \Closure $fail) use ($request) {
-                    if (! $value && ! $request->filled('CELULAR') && ! $request->filled('OTRO_TEL')) {
-                        $fail('Debes indicar al menos un teléfono (Celular 1, Celular 2 u Otro).');
-                    }
-                },
-            ],
-            'CELULAR' => ['nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
-            'OTRO_TEL' => ['nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
-            'MAIL' => [
-                'nullable', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO,
-                function (string $attribute, mixed $value, \Closure $fail) use ($request) {
-                    if (! $value && ! $request->filled('MAIL2')) {
-                        $fail('Debes indicar al menos un correo (Correo Electrónico 1 o 2).');
-                    }
-                },
-            ],
-            'MAIL2' => ['nullable', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO],
-            'FCONTRUC' => ['nullable', 'date'],
-            'NOMED' => ['nullable', 'string', 'max:20'],
-            'FECHA_NAC' => ['nullable', 'date'],
-            'NOHAB' => ['nullable', 'integer', 'min:0'],
-            'NOBATH' => ['nullable', 'integer', 'min:0'],
-            'APLICOBRO' => ['boolean'],
-            'CUOTA_ESPECIAL' => ['boolean'],
+            // --- Datos de Propietario ---
+            'propietario' => ['required', 'array'],
+            'propietario.id' => ['nullable', 'integer', 'exists:propietarios,id'],
+            'propietario.NOMBRES' => ['required', 'string', 'max:60', self::REGEX_SOLO_LETRAS],
+            'propietario.APELLIDOS' => ['required', 'string', 'max:60', self::REGEX_SOLO_LETRAS],
+            'propietario.DNI' => ['nullable', 'string', 'max:30', Rule::unique('propietarios', 'DNI')->ignore($propietarioId)],
+            // al menos un telefono y al menos un correo (required_without* si se evalua con el campo vacio,
+            // a diferencia de una regla personalizada, que Laravel salta cuando el campo viene vacio)
+            'propietario.TELF' => ['nullable', 'required_without_all:propietario.CELULAR,propietario.OTRO_TEL', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
+            'propietario.CELULAR' => ['nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
+            'propietario.OTRO_TEL' => ['nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
+            'propietario.MAIL' => ['nullable', 'required_without:propietario.MAIL2', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO],
+            'propietario.MAIL2' => ['nullable', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO],
+            'propietario.FECHA_NAC' => ['nullable', 'date'],
+
+            // --- Datos de Encargado (todo opcional) ---
+            'encargado' => ['nullable', 'array'],
+            'encargado.NOMBRES' => ['nullable', 'string', 'max:60', self::REGEX_SOLO_LETRAS],
+            'encargado.APELLIDOS' => ['nullable', 'string', 'max:60', self::REGEX_SOLO_LETRAS],
+            'encargado.DNI' => ['nullable', 'string', 'max:30'],
+            'encargado.TELF' => ['nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
+            'encargado.CELULAR' => ['nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
+            'encargado.OTRO_TEL' => ['nullable', 'string', 'max:20', self::REGEX_SOLO_NUMEROS],
+            'encargado.MAIL' => ['nullable', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO],
+            'encargado.MAIL2' => ['nullable', 'email', 'max:60', self::REGEX_CORREO_CON_DOMINIO],
+            'encargado.FECHA_NAC' => ['nullable', 'date'],
+
+            // --- Datos de Villa ---
+            'villa' => ['required', 'array'],
+            'villa.DIR' => ['required', 'string', 'max:255'],
+            'villa.FCONTRUC' => ['required', 'date'],
+            'villa.NOMED' => ['nullable', 'string', 'max:20'],
+            'villa.CLAVE_CATASTRAL' => ['nullable', 'string', 'max:40'],
+            'villa.DESCRIPCION_IP' => ['nullable', 'string', 'max:255'],
+            'villa.NOHAB' => ['nullable', 'integer', 'min:0'],
+            'villa.NOBATH' => ['nullable', 'integer', 'min:0'],
+            'villa.APLICOBRO' => ['boolean'],
+            'villa.CUOTA_ESPECIAL' => ['boolean'],
         ];
 
         if ($creando) {
-            $reglas['CLV_CLIE'] = ['required', 'string', 'max:5', 'unique:propietarios,CLV_CLIE'];
+            $reglas['CLV_CLIE'] = ['required', 'string', 'max:5', 'unique:villas,CLV_CLIE'];
         }
 
         $mensajes = [
             'CLV_CLIE.required' => 'Debes indicar el número de villa.',
             'CLV_CLIE.max' => 'El número de villa no puede tener más de 5 caracteres.',
             'CLV_CLIE.unique' => 'Ya existe una villa registrada con ese número.',
-            'NOMBRES.required' => 'Los nombres del propietario no pueden quedar vacíos.',
-            'NOMBRES.max' => 'Los nombres no pueden superar los 60 caracteres.',
-            'NOMBRES.regex' => 'El nombre solo puede contener letras.',
-            'APELLIDOS.required' => 'Los apellidos del propietario no pueden quedar vacíos.',
-            'APELLIDOS.max' => 'Los apellidos no pueden superar los 60 caracteres.',
-            'APELLIDOS.regex' => 'El apellido solo puede contener letras.',
-            'DIR.required' => 'Debes indicar el bloque de la villa.',
-            'DIR.max' => 'El bloque no puede superar los 255 caracteres.',
-            'TELF.regex' => 'El teléfono solo puede contener números.',
-            'CELULAR.regex' => 'El celular solo puede contener números.',
-            'OTRO_TEL.regex' => 'El teléfono solo puede contener números.',
-            'MAIL.email' => 'El correo electrónico no tiene un formato válido.',
-            'MAIL.regex' => 'El correo debe tener un dominio válido, ej. nombre@dominio.com.',
-            'MAIL2.email' => 'El correo electrónico no tiene un formato válido.',
-            'MAIL2.regex' => 'El correo debe tener un dominio válido, ej. nombre@dominio.com.',
-            'FCONTRUC.date' => 'La fecha de entrega no es válida.',
-            'NOMED.max' => 'La clave ENEE no puede superar los 20 caracteres.',
-            'FECHA_NAC.date' => 'La fecha de nacimiento no es válida.',
-            'NOHAB.integer' => 'El número de habitaciones debe ser un número entero.',
-            'NOHAB.min' => 'El número de habitaciones no puede ser negativo.',
-            'NOBATH.integer' => 'El número de baños debe ser un número entero.',
-            'NOBATH.min' => 'El número de baños no puede ser negativo.',
+            'propietario.id.exists' => 'El propietario seleccionado ya no existe.',
+            'propietario.NOMBRES.required' => 'Los nombres del propietario no pueden quedar vacíos.',
+            'propietario.APELLIDOS.required' => 'Los apellidos del propietario no pueden quedar vacíos.',
+            'propietario.TELF.required_without_all' => 'Debes indicar al menos un teléfono del propietario (Celular 1, Celular 2 u Otro).',
+            'propietario.MAIL.required_without' => 'Debes indicar al menos un correo del propietario (Correo Electrónico 1 o 2).',
+            'propietario.DNI.unique' => 'Ya hay otro propietario con ese DNI/Pasaporte. Búscalo en "Propietario ya registrado".',
+            'villa.DIR.required' => 'Debes indicar la ubicación de la villa.',
+            'villa.DIR.max' => 'La ubicación no puede superar los 255 caracteres.',
+            'villa.FCONTRUC.required' => 'Debes indicar la fecha de entrega de la villa.',
+            'villa.FCONTRUC.date' => 'La fecha de entrega no es válida.',
+            'villa.NOMED.max' => 'El medidor ENEE no puede superar los 20 caracteres.',
+            'villa.CLAVE_CATASTRAL.max' => 'La clave catastral no puede superar los 40 caracteres.',
+            'villa.DESCRIPCION_IP.max' => 'La descripción IP no puede superar los 255 caracteres.',
+            'villa.NOHAB.integer' => 'El número de habitaciones debe ser un número entero.',
+            'villa.NOHAB.min' => 'El número de habitaciones no puede ser negativo.',
+            'villa.NOBATH.integer' => 'El número de baños debe ser un número entero.',
+            'villa.NOBATH.min' => 'El número de baños no puede ser negativo.',
         ];
+
+        // mismos mensajes para propietario y encargado
+        foreach (['propietario' => 'del propietario', 'encargado' => 'del encargado'] as $p => $de) {
+            $mensajes += [
+                "$p.NOMBRES.max" => "Los nombres $de no pueden superar los 60 caracteres.",
+                "$p.NOMBRES.regex" => "El nombre $de solo puede contener letras.",
+                "$p.APELLIDOS.max" => "Los apellidos $de no pueden superar los 60 caracteres.",
+                "$p.APELLIDOS.regex" => "El apellido $de solo puede contener letras.",
+                "$p.DNI.max" => "El DNI/Pasaporte $de no puede superar los 30 caracteres.",
+                "$p.TELF.regex" => "El celular 1 $de solo puede contener números.",
+                "$p.CELULAR.regex" => "El celular 2 $de solo puede contener números.",
+                "$p.OTRO_TEL.regex" => "El teléfono $de solo puede contener números.",
+                "$p.MAIL.email" => "El correo $de no tiene un formato válido.",
+                "$p.MAIL.regex" => 'El correo debe tener un dominio válido, ej. nombre@dominio.com.',
+                "$p.MAIL2.email" => "El correo $de no tiene un formato válido.",
+                "$p.MAIL2.regex" => 'El correo debe tener un dominio válido, ej. nombre@dominio.com.',
+                "$p.FECHA_NAC.date" => "La fecha de nacimiento $de no es válida.",
+            ];
+        }
 
         $data = $request->validate($reglas, $mensajes);
 
-        $data['NOMBRES'] = mb_strtoupper($data['NOMBRES'], 'UTF-8');
-        $data['APELLIDOS'] = mb_strtoupper($data['APELLIDOS'], 'UTF-8');
+        // Todo el texto se guarda en mayusculas, salvo los correos (en minusculas: asi se escriben y
+        // se comparan siempre igual).
+        $mayus = fn (?string $v) => $v === null ? null : (mb_strtoupper(trim($v), 'UTF-8') ?: null);
+        $minus = fn (?string $v) => $v === null ? null : (mb_strtolower(trim($v), 'UTF-8') ?: null);
 
-        return $data;
+        $normalizarPersona = function (array $p) use ($mayus, $minus): array {
+            foreach (['NOMBRES', 'APELLIDOS', 'DNI'] as $c) {
+                if (array_key_exists($c, $p)) {
+                    $p[$c] = $mayus($p[$c]);
+                }
+            }
+            foreach (['MAIL', 'MAIL2'] as $c) {
+                if (array_key_exists($c, $p)) {
+                    $p[$c] = $minus($p[$c]);
+                }
+            }
+
+            return $p;
+        };
+
+        $propietario = $normalizarPersona($data['propietario']);
+        $encargado = $normalizarPersona($data['encargado'] ?? []);
+
+        $villa = $data['villa'];
+        foreach (['DIR', 'NOMED', 'CLAVE_CATASTRAL', 'DESCRIPCION_IP'] as $c) {
+            if (array_key_exists($c, $villa)) {
+                $villa[$c] = $mayus($villa[$c]);
+            }
+        }
+        if ($creando) {
+            $villa['CLV_CLIE'] = $data['CLV_CLIE'];
+        }
+
+        return ['villa' => $villa, 'propietario' => $propietario, 'encargado' => $encargado];
     }
 
     private function resumen(Villa $villa, float $saldo): array
@@ -259,24 +343,27 @@ class VillaController extends Controller
 
     private function detalle(Villa $villa): array
     {
+        $villa->loadMissing(['propietario.villas', 'encargado']);
+        $e = $villa->encargado;
+
         return [
             'CLV_CLIE' => $villa->CLV_CLIE,
-            'NOMBRES' => $villa->NOMBRES,
-            'APELLIDOS' => $villa->APELLIDOS,
-            'DIR' => $villa->DIR,
-            'TELF' => $villa->TELF,
-            'CELULAR' => $villa->CELULAR,
-            'OTRO_TEL' => $villa->OTRO_TEL,
-            'MAIL' => $villa->MAIL,
-            'MAIL2' => $villa->MAIL2,
-            'FCONTRUC' => $villa->FCONTRUC?->toDateString(),
-            'NOMED' => $villa->NOMED,
-            'FECHA_NAC' => $villa->FECHA_NAC?->toDateString(),
-            'NOHAB' => $villa->NOHAB,
-            'NOBATH' => $villa->NOBATH,
-            'APLICOBRO' => (bool) $villa->APLICOBRO,
-            'CUOTA_ESPECIAL' => (bool) $villa->CUOTA_ESPECIAL,
-            'MONTO_CUOTA_ESPECIAL' => $villa->MONTO_CUOTA_ESPECIAL !== null ? (float) $villa->MONTO_CUOTA_ESPECIAL : null,
+            'villa' => [
+                'DIR' => $villa->DIR,
+                'FCONTRUC' => $villa->FCONTRUC?->toDateString(),
+                'NOMED' => $villa->NOMED,
+                'CLAVE_CATASTRAL' => $villa->CLAVE_CATASTRAL,
+                'DESCRIPCION_IP' => $villa->DESCRIPCION_IP,
+                'NOHAB' => $villa->NOHAB,
+                'NOBATH' => $villa->NOBATH,
+                'APLICOBRO' => (bool) $villa->APLICOBRO,
+                'CUOTA_ESPECIAL' => (bool) $villa->CUOTA_ESPECIAL,
+                'MONTO_CUOTA_ESPECIAL' => $villa->MONTO_CUOTA_ESPECIAL !== null ? (float) $villa->MONTO_CUOTA_ESPECIAL : null,
+            ],
+            'propietario' => $villa->propietario ? PropietarioController::serializar($villa->propietario) : null,
+            'encargado' => $e
+                ? ['FECHA_NAC' => $e->FECHA_NAC?->toDateString()] + $e->only(Encargado::CAMPOS)
+                : null,
             'SALDO' => $this->saldoService->saldoDeVilla($villa),
         ];
     }

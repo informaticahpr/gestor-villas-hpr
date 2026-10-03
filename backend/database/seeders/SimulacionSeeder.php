@@ -227,7 +227,7 @@ class SimulacionSeeder extends Seeder
 
             $telefono = fn (string $prefijo) => $prefijo.mt_rand(100, 999).'-'.mt_rand(1000, 9999);
 
-            Villa::create([
+            Villa::crearConPropietario([
                 'CLV_CLIE' => $id,
                 'NOMBRES' => $nombres,
                 'APELLIDOS' => $apellidos,

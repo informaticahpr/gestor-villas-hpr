@@ -112,7 +112,7 @@ class VillaSeeder extends Seeder
     public function run(): void
     {
         foreach (self::definiciones() as $d) {
-            Villa::create([
+            Villa::crearConPropietario([
                 'CLV_CLIE' => $d['id'],
                 'NOMBRES' => $d['nombres'],
                 'APELLIDOS' => $d['apellidos'],
