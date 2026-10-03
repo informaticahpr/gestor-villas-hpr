@@ -17,6 +17,8 @@ class ReciboController extends Controller
             'titulo' => 'Recibo de '.($movimiento->concepto->ES_CARGO ? 'Cargo' : 'Crédito / Abono'),
             'movimiento' => $movimiento,
             'usuario' => auth()->user()?->name ?? 'Sistema',
+            'sinNombreHotel' => true,
+            'subtitulo' => 'Administración de Villas · Tel. 9460-2996',
         ]);
 
         // recibo-<folio>_<villa>_<fecha del movimiento>.pdf

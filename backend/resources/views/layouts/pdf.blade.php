@@ -54,22 +54,7 @@
     </style>
 </head>
 <body>
-    <table class="cabecera">
-        <tr>
-            <td class="logo"><img src="{{ $logo }}" alt=""></td>
-            <td>
-                <div class="empresa">Hotel y Villas Palma Real</div>
-                <div class="titulo">{{ $titulo }}</div>
-                @isset($subtitulo)
-                    <div class="subtitulo">{{ $subtitulo }}</div>
-                @endisset
-            </td>
-            <td class="generado">
-                Generado el {{ now()->format('d/m/Y H:i') }}
-                <div class="usuario">Por: {{ $usuario }}</div>
-            </td>
-        </tr>
-    </table>
+    @include('layouts._cabecera-pdf')
 
     @yield('contenido')
 </body>
