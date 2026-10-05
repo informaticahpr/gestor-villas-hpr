@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\ExportaArchivos;
 use App\Http\Controllers\Controller;
+use App\Models\Concepto;
+use App\Models\Movimiento;
 use App\Models\Villa;
 use App\Services\ReporteExcelService;
 use App\Services\SaldoService;
@@ -118,6 +120,96 @@ class ReporteController extends Controller
             $this->excel->antiguedadDeSaldos($hasta, $this->saldoService->antiguedadDeSaldos($hasta), $this->usuarioActual()),
             $this->nombreArchivo('antiguedad-de-saldos', null, $this->fechaParaArchivo($hasta), 'xlsx'),
         );
+    }
+
+    // --- Por concepto: movimientos de un concepto (cargo o credito) en un rango de fechas ---
+
+    public function porConcepto(Request $request)
+    {
+        $d = $this->datosPorConcepto($request);
+
+        return response()->json([
+            'data' => $d['filas'],
+            'total' => round($d['filas']->sum('importe'), 2),
+            'concepto' => ['NUM_CPTO' => $d['concepto']->NUM_CPTO, 'DESCR' => $d['concepto']->DESCR, 'ES_CARGO' => (bool) $d['concepto']->ES_CARGO],
+        ]);
+    }
+
+    public function porConceptoPdf(Request $request): Response
+    {
+        $d = $this->datosPorConcepto($request);
+
+        return $this->pdf('reportes.por-concepto', [
+            'titulo' => 'Reporte por concepto',
+            'subtitulo' => $d['subtitulo'],
+            'filas' => $d['filas'],
+            'total' => $d['filas']->sum('importe'),
+            'esCargo' => (bool) $d['concepto']->ES_CARGO,
+        ], $this->nombreArchivo('reporte-por-concepto', $d['villa'] ?? 'todas', $this->rangoParaArchivo($d['desde'], $d['hasta']), 'pdf'), 'landscape');
+    }
+
+    public function exportarPorConceptoXlsx(Request $request): StreamedResponse
+    {
+        $d = $this->datosPorConcepto($request);
+
+        return $this->descargarXlsx(
+            $this->excel->porConcepto($d['subtitulo'], $d['filas'], (bool) $d['concepto']->ES_CARGO, $this->usuarioActual()),
+            $this->nombreArchivo('reporte-por-concepto', $d['villa'] ?? 'todas', $this->rangoParaArchivo($d['desde'], $d['hasta']), 'xlsx'),
+        );
+    }
+
+    /**
+     * Movimientos vigentes (sin anulados) de un concepto entre dos fechas, opcionalmente de una sola
+     * villa, del mas antiguo al mas reciente.
+     *
+     * @return array{concepto: Concepto, filas: Collection, desde: Carbon, hasta: Carbon, villa: ?string, subtitulo: string}
+     */
+    private function datosPorConcepto(Request $request): array
+    {
+        $data = $request->validate([
+            'concepto' => ['required', 'integer', 'exists:conceptos,NUM_CPTO'],
+            'villa' => ['nullable', 'string', 'exists:villas,CLV_CLIE'],
+            'desde' => ['required', 'date'],
+            'hasta' => ['required', 'date', 'after_or_equal:desde'],
+        ], [
+            'concepto.required' => 'Debes seleccionar un concepto.',
+            'concepto.exists' => 'El concepto seleccionado no existe.',
+            'villa.exists' => 'La villa seleccionada no existe.',
+            'desde.required' => 'Debes indicar la fecha de inicio.',
+            'desde.date' => 'La fecha de inicio no es válida.',
+            'hasta.required' => 'Debes indicar la fecha de corte.',
+            'hasta.date' => 'La fecha de corte no es válida.',
+            'hasta.after_or_equal' => 'La fecha de corte no puede ser anterior a la fecha de inicio.',
+        ]);
+
+        $concepto = Concepto::findOrFail($data['concepto']);
+        $desde = Carbon::parse($data['desde']);
+        $hasta = Carbon::parse($data['hasta']);
+        $villa = $data['villa'] ?? null;
+
+        $filas = Movimiento::with(['villa', 'formaPago'])
+            ->where('NUM_CPTO', $concepto->NUM_CPTO)
+            ->whereBetween('FECHA_APLI', [$desde->toDateString(), $hasta->toDateString()])
+            ->when($villa, fn ($q) => $q->where('CLV_CLIE', $villa))
+            ->orderBy('FECHA_APLI')
+            ->orderBy('ID_MOV')
+            ->get()
+            ->map(fn (Movimiento $m) => [
+                'id' => $m->ID_MOV,
+                'fecha' => $m->FECHA_APLI->toDateString(),
+                'folio' => $m->FOLIO,
+                'villa' => $m->CLV_CLIE,
+                'propietario' => $m->villa?->nombre_completo,
+                'descripcion' => $m->OBS,
+                'forma_pago' => $m->formaPago?->nombre,
+                'importe' => (float) $m->IMPORTE,
+            ]);
+
+        $subtitulo = 'Concepto: '.$concepto->DESCR.($concepto->ES_CARGO ? ' (cargo)' : ' (crédito)')
+            .' · Del '.$desde->format('d/m/Y').' al '.$hasta->format('d/m/Y')
+            .' · '.($villa ? "Villa {$villa}" : 'Todas las villas');
+
+        return compact('concepto', 'filas', 'desde', 'hasta', 'villa', 'subtitulo');
     }
 
     // --- datos compartidos por las vistas JSON, los PDF y los Excel ---

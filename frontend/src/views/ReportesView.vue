@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../lib/api'
-import type { VillaResumen, EstadoCuenta, MovimientoFila } from '../types'
+import type { VillaResumen, EstadoCuenta, MovimientoFila, Concepto } from '../types'
 import { useDataStore } from '../stores/data'
 import { useToastStore } from '../stores/toast'
 import { formatearMonto } from '../lib/format'
 import { hoyLocal, inicioDeMes } from '../lib/fecha'
 import { formatearFecha } from '../lib/fechaFormato'
 import FechaInput from '../components/FechaInput.vue'
-import { abrirReporte, type FormatoExportacion } from '../lib/exportar'
+import { abrirReporte, abrirRecibo, type FormatoExportacion } from '../lib/exportar'
 import ExportarBotones from '../components/ExportarBotones.vue'
 import VillaBuscador from '../components/VillaBuscador.vue'
 import ObservacionModal from '../components/ObservacionModal.vue'
@@ -16,7 +16,7 @@ import ObservacionModal from '../components/ObservacionModal.vue'
 const dataStore = useDataStore()
 const toast = useToastStore()
 
-const tab = ref<'estado' | 'general' | 'antiguedad'>('estado')
+const tab = ref<'estado' | 'general' | 'antiguedad' | 'concepto'>('estado')
 
 // fechas por defecto en la zona de la app (Tegucigalpa), no en UTC
 function hoy(): string {
@@ -158,17 +158,85 @@ function exportarAntiguedad(formato: FormatoExportacion) {
   abrirReporte('antiguedad-saldos', formato, { hasta: hastaAntiguedad.value })
 }
 
+// --- Por concepto: movimientos de un concepto (cargo o crédito) en un rango de fechas ---
+const conceptos = ref<Concepto[]>([])
+const conceptoFiltro = ref<number | ''>('')
+const villaConcepto = ref('') // '' = todas
+const desdeConcepto = ref(primerDiaMesActual())
+const hastaConcepto = ref(hoy())
+const cargandoConcepto = ref(false)
+const movimientosConcepto = ref<
+  Array<{ id: number; fecha: string; folio: string | null; villa: string; propietario: string | null; descripcion: string | null; forma_pago: string | null; importe: number }>
+>([])
+const totalConcepto = ref(0)
+/** Concepto del ultimo reporte generado (la tabla muestra la forma de pago solo si es credito). */
+const conceptoGenerado = ref<{ DESCR: string; ES_CARGO: boolean } | null>(null)
+
+const conceptosCargo = computed(() => conceptos.value.filter((c) => c.ES_CARGO))
+const conceptosCredito = computed(() => conceptos.value.filter((c) => !c.ES_CARGO))
+
+watch(desdeConcepto, (nuevo) => {
+  if (hastaConcepto.value < nuevo) hastaConcepto.value = nuevo
+})
+
+async function cargarConceptos() {
+  try {
+    // incluye los inactivos: puede haber movimientos viejos de conceptos que ya no se usan
+    const { data } = await api.get('/api/conceptos', { params: { incluir_inactivos: true } })
+    conceptos.value = data.data
+  } catch {
+    toast.error('No se pudieron cargar los conceptos.')
+  }
+}
+
+function paramsConcepto() {
+  return { concepto: String(conceptoFiltro.value), villa: villaConcepto.value, desde: desdeConcepto.value, hasta: hastaConcepto.value }
+}
+
+async function generarPorConcepto() {
+  if (conceptoFiltro.value === '') {
+    toast.warning('Selecciona un concepto.')
+    return
+  }
+  cargandoConcepto.value = true
+  try {
+    const p = paramsConcepto()
+    const { data } = await api.get('/api/reportes/por-concepto', { params: { ...p, villa: p.villa || undefined } })
+    movimientosConcepto.value = data.data
+    totalConcepto.value = data.total
+    conceptoGenerado.value = data.concepto
+  } catch (e: any) {
+    toast.error(e?.response?.data?.message ?? 'No se pudo generar el reporte por concepto.')
+  } finally {
+    cargandoConcepto.value = false
+  }
+}
+
+function exportarPorConcepto(formato: FormatoExportacion) {
+  if (conceptoFiltro.value === '') {
+    toast.warning('Selecciona un concepto.')
+    return
+  }
+  abrirReporte('por-concepto', formato, paramsConcepto())
+}
+
 async function cargarTodo() {
   await generarEstadoCuenta()
   await generarSaldoGeneral()
   await generarAntiguedad()
 }
 
-onMounted(cargarTodo)
+onMounted(() => {
+  cargarTodo()
+  cargarConceptos()
+})
 
 // se refresca sola si se aplica un cargo/abono o se crea/edita una villa
 // desde otra pantalla (ej. el modal "Cargo/Crédito" del menú superior)
-watch(() => dataStore.version, cargarTodo)
+watch(() => dataStore.version, () => {
+  cargarTodo()
+  if (conceptoGenerado.value) generarPorConcepto()
+})
 </script>
 
 <template>
@@ -197,7 +265,102 @@ watch(() => dataStore.version, cargarTodo)
       >
         Antigüedad de Saldos
       </button>
+      <button
+        class="border-b-2 px-1 pb-2 font-medium"
+        :class="tab === 'concepto' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
+        @click="tab = 'concepto'"
+      >
+        Por Concepto
+      </button>
     </div>
+
+    <!-- Por concepto -->
+    <section v-if="tab === 'concepto'">
+      <form class="mb-6 space-y-3" @submit.prevent="generarPorConcepto">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="w-full max-w-xs">
+            <label class="mb-1 block text-sm font-medium text-espresso-700">Concepto</label>
+            <select v-model="conceptoFiltro" class="w-full rounded-lg border border-espresso-800/15 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+              <option value="" disabled>Selecciona un concepto</option>
+              <optgroup label="Cargos">
+                <option v-for="c in conceptosCargo" :key="c.NUM_CPTO" :value="c.NUM_CPTO">{{ c.DESCR }}{{ c.ACTIVO ? '' : ' (inactivo)' }}</option>
+              </optgroup>
+              <optgroup label="Créditos">
+                <option v-for="c in conceptosCredito" :key="c.NUM_CPTO" :value="c.NUM_CPTO">{{ c.DESCR }}{{ c.ACTIVO ? '' : ' (inactivo)' }}</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="w-full max-w-sm">
+            <label class="mb-1 block text-sm font-medium text-espresso-700">Villa</label>
+            <VillaBuscador v-model="villaConcepto" con-opcion-todas />
+          </div>
+        </div>
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="mb-1 block text-sm font-medium text-espresso-700">Desde</label>
+            <FechaInput v-model="desdeConcepto" class="w-40 rounded-lg border border-espresso-800/15 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-espresso-700">Hasta</label>
+            <FechaInput v-model="hastaConcepto" :min="desdeConcepto" class="w-40 rounded-lg border border-espresso-800/15 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
+          </div>
+          <button type="submit" class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+            Generar
+          </button>
+          <ExportarBotones @exportar="exportarPorConcepto" />
+        </div>
+      </form>
+
+      <p v-if="cargandoConcepto" class="text-espresso-800/40">Cargando...</p>
+
+      <div v-if="conceptoGenerado" class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-gold-300/20 pb-3">
+          <h2 class="font-display font-semibold text-espresso-800">
+            {{ conceptoGenerado.DESCR }}
+            <span class="ml-1 rounded-full px-2 py-0.5 text-xs font-medium" :class="conceptoGenerado.ES_CARGO ? 'bg-brand-100 text-brand-800' : 'bg-emerald-100 text-emerald-800'">
+              {{ conceptoGenerado.ES_CARGO ? 'Cargo' : 'Crédito' }}
+            </span>
+          </h2>
+          <p class="font-display font-semibold text-espresso-800">
+            Total: {{ formatearMonto(totalConcepto) }}
+            <span class="text-sm font-normal text-espresso-800/55">· {{ movimientosConcepto.length }} {{ movimientosConcepto.length === 1 ? 'movimiento' : 'movimientos' }}</span>
+          </p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gold-300/20 text-sm">
+            <thead>
+              <tr class="text-left text-espresso-800/50">
+                <th class="py-1.5 pr-2">Fecha</th>
+                <th class="py-1.5 pr-2">Folio</th>
+                <th class="py-1.5 pr-2">Villa</th>
+                <th class="py-1.5 pr-2">Propietario</th>
+                <th class="py-1.5 pr-2">Descripción</th>
+                <th v-if="!conceptoGenerado.ES_CARGO" class="py-1.5 pr-2">Forma de pago</th>
+                <th class="py-1.5 pr-2 text-right">Importe</th>
+                <th class="py-1.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gold-300/15">
+              <tr v-for="m in movimientosConcepto" :key="m.id" class="hover:bg-brand-50/40">
+                <td class="whitespace-nowrap py-1.5 pr-2">{{ formatearFecha(m.fecha) }}</td>
+                <td class="whitespace-nowrap py-1.5 pr-2 font-mono text-xs">{{ m.folio ?? '—' }}</td>
+                <td class="py-1.5 pr-2 font-medium">{{ m.villa }}</td>
+                <td class="py-1.5 pr-2">{{ m.propietario }}</td>
+                <td class="py-1.5 pr-2 text-espresso-800/80">{{ m.descripcion }}</td>
+                <td v-if="!conceptoGenerado.ES_CARGO" class="py-1.5 pr-2">{{ m.forma_pago ?? '—' }}</td>
+                <td class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">{{ formatearMonto(m.importe) }}</td>
+                <td class="py-1.5 text-right">
+                  <button type="button" class="text-xs font-medium text-brand-700 hover:underline" @click="abrirRecibo(m.id)">Recibo</button>
+                </td>
+              </tr>
+              <tr v-if="movimientosConcepto.length === 0">
+                <td :colspan="conceptoGenerado.ES_CARGO ? 7 : 8" class="py-8 text-center text-espresso-800/40">Sin movimientos de este concepto en el rango</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
 
     <!-- Estado de cuenta -->
     <section v-if="tab === 'estado'">

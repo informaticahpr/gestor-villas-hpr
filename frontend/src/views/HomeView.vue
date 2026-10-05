@@ -22,20 +22,22 @@ interface Dashboard {
   villas: number
   cuota_mantenimiento: number | null
   cuentas_por_cobrar: number
-  saldo_a_favor: number
+  /** Solo Director/Admin */
+  saldo_a_favor?: number
   mes: Periodo
-  anio: Periodo & { anio: number; meses: (Periodo & { mes: number })[] }
+  /** Solo Director/Admin */
+  anio?: Periodo & { anio: number; meses: (Periodo & { mes: number })[] }
 }
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
-// El dashboard solo lo ven Director y Admin (el endpoint tambien esta restringido a esos roles).
+// Todos ven el dashboard; al Supervisor el backend solo le manda villas, cuota, cuentas por cobrar y
+// lo recuperado en el mes (saldo a favor y el año son de Director/Admin).
 const dashboard = ref<Dashboard | null>(null)
 const errorDashboard = ref(false)
 
 async function cargarDashboard() {
-  if (!auth.esDirectorOAdmin()) return
   try {
     const { data } = await api.get<Dashboard>('/api/dashboard')
     dashboard.value = data
@@ -66,15 +68,14 @@ const fechaCorte = computed(() => {
 
 /** Escala comun de las barras mensuales: el mayor valor (cxc o recuperado) del año. */
 const maxMensual = computed(() => {
-  const meses = dashboard.value?.anio.meses ?? []
+  const meses = dashboard.value?.anio?.meses ?? []
   return Math.max(1, ...meses.flatMap((m) => [m.cxc, m.recuperado]))
 })
 
 const mesActivo = ref<number | null>(null)
 
-// Con el dashboard (Director/Admin) los accesos rapidos van abajo y mas pequeños; el Supervisor
-// solo ve las tarjetas, en su tamaño normal.
-const compacto = computed(() => auth.esDirectorOAdmin())
+// Debajo del dashboard los accesos rapidos van mas pequeños.
+const compacto = computed(() => true)
 const tarjeta =
   'group rounded-xl border border-gold-300/30 bg-cream-50 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-lg hover:shadow-brand-900/5'
 const icono =
@@ -118,7 +119,7 @@ const acciones = [
 
 <template>
   <div>
-    <div :class="auth.esDirectorOAdmin() ? 'mb-6' : 'mb-8'">
+    <div class="mb-6">
       <p class="font-display text-2xl font-semibold text-espresso-800">
         Bienvenido, {{ auth.user?.name }}
       </p>
@@ -128,8 +129,8 @@ const acciones = [
       </p>
     </div>
 
-    <!-- Dashboard: solo Director y Admin -->
-    <section v-if="auth.esDirectorOAdmin()" class="mb-8">
+    <!-- Dashboard (el Supervisor ve solo villas, cuota, cuentas por cobrar y lo recuperado en el mes) -->
+    <section class="mb-8">
       <p v-if="errorDashboard" class="rounded-xl border border-wine-500/20 bg-wine-500/5 p-4 text-sm text-wine-600">
         No se pudo cargar el resumen.
         <button class="ml-1 font-semibold underline" @click="cargarDashboard">Reintentar</button>
@@ -141,7 +142,7 @@ const acciones = [
 
       <template v-else>
         <!-- Indicadores -->
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-4" :class="dashboard.saldo_a_favor !== undefined ? 'lg:grid-cols-4' : 'lg:grid-cols-3'">
           <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-4 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Villas registradas</p>
             <p class="mt-2 font-display text-2xl font-semibold text-espresso-800 tabular-nums">{{ dashboard.villas }}</p>
@@ -158,7 +159,7 @@ const acciones = [
             <p class="mt-2 font-display text-2xl font-semibold text-espresso-800 tabular-nums">{{ formatearMonto(dashboard.cuentas_por_cobrar) }}</p>
             <p class="mt-0.5 text-xs text-espresso-800/45">saldo a la fecha</p>
           </div>
-          <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-4 shadow-sm">
+          <div v-if="dashboard.saldo_a_favor !== undefined" class="rounded-xl border border-gold-300/30 bg-cream-50 p-4 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Saldo a favor de propietarios</p>
             <p class="mt-2 font-display text-2xl font-semibold text-espresso-800 tabular-nums">{{ formatearMonto(dashboard.saldo_a_favor) }}</p>
             <p class="mt-0.5 text-xs text-espresso-800/45">a la fecha</p>
@@ -166,7 +167,7 @@ const acciones = [
         </div>
 
         <!-- Recuperado: mes y año -->
-        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div class="mt-4 grid grid-cols-1 gap-4" :class="dashboard.anio ? 'lg:grid-cols-3' : ''">
           <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Recuperado en {{ nombreMes }}</p>
             <p class="mt-2 font-display text-3xl font-semibold text-espresso-800 tabular-nums">{{ formatearMonto(dashboard.mes.recuperado) }}</p>
@@ -179,7 +180,7 @@ const acciones = [
             <p class="mt-2 text-sm font-semibold text-espresso-800 tabular-nums">{{ porcentaje(dashboard.mes) }}% recuperado</p>
           </div>
 
-          <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm lg:col-span-2">
+          <div v-if="dashboard.anio" class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm lg:col-span-2">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Recuperado en {{ dashboard.anio.anio }}</p>
@@ -235,7 +236,7 @@ const acciones = [
       </template>
     </section>
 
-    <p v-if="auth.esDirectorOAdmin()" class="mb-3 text-xs font-medium uppercase tracking-wide text-espresso-800/50">Accesos rápidos</p>
+    <p class="mb-3 text-xs font-medium uppercase tracking-wide text-espresso-800/50">Accesos rápidos</p>
 
     <div :class="compacto ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6' : 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'">
       <button

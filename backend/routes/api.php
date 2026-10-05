@@ -22,6 +22,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::get('/hoy', HoyController::class);
+    // todos los roles; el Supervisor solo recibe los indicadores basicos (ver DashboardController)
+    Route::get('/dashboard', DashboardController::class);
 
     Route::get('/villas', [VillaController::class, 'index']);
     Route::get('/villas/{villa}', [VillaController::class, 'show']);
@@ -47,10 +49,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reportes/antiguedad-saldos', [ReporteController::class, 'antiguedadSaldos']);
     Route::get('/reportes/antiguedad-saldos/exportar', [ReporteController::class, 'exportarAntiguedadXlsx']);
     Route::get('/reportes/antiguedad-saldos/pdf', [ReporteController::class, 'antiguedadSaldosPdf']);
+    Route::get('/reportes/por-concepto', [ReporteController::class, 'porConcepto']);
+    Route::get('/reportes/por-concepto/exportar', [ReporteController::class, 'exportarPorConceptoXlsx']);
+    Route::get('/reportes/por-concepto/pdf', [ReporteController::class, 'porConceptoPdf']);
 
     Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN)->group(function () {
-        Route::get('/dashboard', DashboardController::class);
-
         Route::patch('/movimientos/{movimiento}/anular', [MovimientoController::class, 'anular']);
 
         Route::put('/villas/{villa}', [VillaController::class, 'update']);

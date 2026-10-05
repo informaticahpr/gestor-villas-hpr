@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Concepto;
 use App\Models\Movimiento;
+use App\Models\Role;
 use App\Models\Villa;
 use App\Services\SaldoService;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 /**
- * Indicadores del inicio (solo Director/Admin): villas registradas, cuota de mantenimiento,
- * cuentas por cobrar y saldo a favor a la fecha, y lo recuperado en el mes y en el año.
+ * Indicadores del inicio: villas registradas, cuota de mantenimiento, cuentas por cobrar y saldo a
+ * favor a la fecha, y lo recuperado en el mes y en el año. El Supervisor solo recibe villas, cuota,
+ * cuentas por cobrar y lo recuperado en el mes; el resto es para Director/Admin.
  *
  * "Recuperado" = creditos/abonos aplicados en el periodo, comparados contra los cargos (cuentas
  * por cobrar) generados en ese mismo periodo. Puede pasar del 100% cuando se cobra deuda de
@@ -21,7 +24,7 @@ class DashboardController extends Controller
 {
     public function __construct(private readonly SaldoService $saldoService) {}
 
-    public function __invoke()
+    public function __invoke(Request $request)
     {
         $hoy = Carbon::today();
         $saldos = $this->saldoService->saldosPorVilla($hoy);
@@ -49,7 +52,7 @@ class DashboardController extends Controller
 
         $delMes = $meses->last();
 
-        return response()->json([
+        $datos = [
             'fecha' => $hoy->toDateString(),
             'villas' => Villa::count(),
             'cuota_mantenimiento' => $cuota !== null ? (float) $cuota : null,
@@ -65,6 +68,13 @@ class DashboardController extends Controller
                 'recuperado' => round($meses->sum('recuperado'), 2),
                 'meses' => $meses,
             ],
-        ]);
+        ];
+
+        // el Supervisor no ve el saldo a favor ni lo recuperado en el año
+        if (! in_array($request->user()?->role?->nombre, [Role::DIRECTOR, Role::ADMIN], true)) {
+            unset($datos['saldo_a_favor'], $datos['anio']);
+        }
+
+        return response()->json($datos);
     }
 }

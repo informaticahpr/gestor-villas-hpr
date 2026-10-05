@@ -83,6 +83,56 @@ class ReporteExcelService
         return $libro;
     }
 
+    /** Reporte por concepto: movimientos de un concepto (cargo o credito) en un rango de fechas. */
+    public function porConcepto(string $subtitulo, Collection $filas, bool $esCargo, string $usuario): Spreadsheet
+    {
+        // los creditos llevan ademas la forma de pago
+        $titulos = ['Fecha', 'Folio', 'Villa', 'Propietario', 'Descripción', ...($esCargo ? [] : ['Forma de pago']), 'Importe'];
+        $ultima = $esCargo ? 'F' : 'G';
+        [$libro, $hoja] = $this->plantilla('Reporte por concepto', $subtitulo, $ultima, PageSetup::ORIENTATION_LANDSCAPE, $usuario);
+        $this->anchos($hoja, ['A' => 13, 'B' => 13, 'C' => 9, 'D' => 34, 'E' => 50] + ($esCargo ? ['F' => 16] : ['F' => 18, 'G' => 16]));
+
+        $fila = self::FILA_INICIAL;
+        $this->encabezadoTabla($hoja, $fila, $titulos, [$ultima]);
+        $primera = $fila + 1;
+
+        foreach ($filas->values() as $i => $f) {
+            $fila++;
+            $hoja->setCellValue("A{$fila}", Carbon::parse($f['fecha'])->format('d/m/Y'));
+            $hoja->setCellValue("B{$fila}", $f['folio'] ?? '—');
+            $hoja->setCellValue("C{$fila}", $f['villa']);
+            $hoja->setCellValue("D{$fila}", $f['propietario']);
+            $hoja->setCellValue("E{$fila}", $f['descripcion']);
+            if (! $esCargo) {
+                $hoja->setCellValue("F{$fila}", $f['forma_pago'] ?? '—');
+            }
+            $hoja->setCellValue("{$ultima}{$fila}", $f['importe']);
+            $this->filaDeDatos($hoja, "A{$fila}:{$ultima}{$fila}", $i % 2 === 1);
+        }
+
+        if ($filas->isEmpty()) {
+            $this->filaVacia($hoja, ++$fila, $ultima, 'Sin movimientos de este concepto en el rango');
+        } else {
+            $hoja->getStyle("{$ultima}{$primera}:{$ultima}{$fila}")->getNumberFormat()->setFormatCode(self::MONEDA);
+            $hoja->getStyle("{$ultima}{$primera}:{$ultima}{$fila}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $hoja->getStyle("E{$primera}:E{$fila}")->getAlignment()->setWrapText(true);
+            $hoja->setAutoFilter('A'.self::FILA_INICIAL.":{$ultima}{$fila}");
+
+            $fila++;
+            $penultima = chr(ord($ultima) - 1);
+            $hoja->setCellValue("A{$fila}", 'TOTAL ('.$filas->count().' '.($filas->count() === 1 ? 'movimiento' : 'movimientos').')');
+            $hoja->mergeCells("A{$fila}:{$penultima}{$fila}");
+            $hoja->setCellValue("{$ultima}{$fila}", $filas->sum('importe'));
+            $this->filaDeTotal($hoja, "A{$fila}:{$ultima}{$fila}", 12);
+            $hoja->getStyle("{$ultima}{$fila}")->getNumberFormat()->setFormatCode(self::MONEDA);
+        }
+
+        $this->configurarImpresion($hoja, $fila, true);
+        $hoja->freezePane('A'.(self::FILA_INICIAL + 1));
+
+        return $libro;
+    }
+
     public function antiguedadDeSaldos(Carbon $hasta, array $antiguedad, string $usuario): Spreadsheet
     {
         $titulo = 'Antigüedad de Saldos';
