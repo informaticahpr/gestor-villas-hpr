@@ -158,7 +158,7 @@ class ReporteController extends Controller
 
         $villas = isset($data['villa'])
             ? Villa::where('CLV_CLIE', $data['villa'])->get()
-            : Villa::orderBy('CLV_CLIE')->get();
+            : Villa::todasEnOrden();
 
         $saldos = $this->saldoService->saldosPorVilla();
 

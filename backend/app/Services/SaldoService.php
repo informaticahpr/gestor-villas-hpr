@@ -117,7 +117,7 @@ class SaldoService
      */
     public function saldosGenerales(Carbon $hasta, bool $omitirAlDia = false, bool $omitirAFavor = false, bool $soloNegativos = false): Collection
     {
-        return Villa::orderBy('CLV_CLIE')->get()->map(function (Villa $villa) use ($hasta) {
+        return Villa::todasEnOrden()->map(function (Villa $villa) use ($hasta) {
             return [
                 'villa' => $villa->CLV_CLIE,
                 'propietario' => $villa->nombre_completo,
@@ -156,7 +156,7 @@ class SaldoService
 
         $filas = collect();
 
-        foreach (Villa::orderBy('CLV_CLIE')->get() as $villa) {
+        foreach (Villa::todasEnOrden() as $villa) {
             $saldo = $this->saldoDeVilla($villa, $hasta);
 
             if ($saldo <= 0) {

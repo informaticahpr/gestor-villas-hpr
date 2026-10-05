@@ -34,11 +34,16 @@ class VillaController extends Controller
                         ->orWhereHas('propietario', fn ($p) => $p
                             ->whereRaw($this->columnaSinAcentos('NOMBRES').' LIKE ?', ["%{$q}%"])
                             ->orWhereRaw($this->columnaSinAcentos('APELLIDOS').' LIKE ?', ["%{$q}%"]));
-                })->limit(8);
+                });
             })
             ->when($request->boolean('cuota_especial'), fn ($query) => $query->where('CUOTA_ESPECIAL', true))
-            ->orderBy('CLV_CLIE')
             ->get();
+
+        // orden natural (A-1, A-2 ... A-10) y, al buscar, solo las primeras 8 ya ordenadas
+        $villas = Villa::enOrdenNatural($villas);
+        if ($q !== '') {
+            $villas = $villas->take(8);
+        }
 
         $saldos = $this->saldoService->saldosPorVilla();
 

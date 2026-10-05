@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,6 +39,24 @@ class Villa extends Model
             'CUOTA_ESPECIAL' => 'boolean',
             'MONTO_CUOTA_ESPECIAL' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Ordena por numero de villa como lo haria una persona: A-1, A-2, ... A-10 (ordenar en SQL por
+     * texto da A-1, A-10, A-11, A-2). Se hace en PHP para no depender del motor (SQLite/PostgreSQL).
+     *
+     * @param  Collection<int, Villa>  $villas
+     * @return Collection<int, Villa>
+     */
+    public static function enOrdenNatural(Collection $villas): Collection
+    {
+        return $villas->sortBy('CLV_CLIE', SORT_NATURAL | SORT_FLAG_CASE)->values();
+    }
+
+    /** Todas las villas en orden natural (ver enOrdenNatural). */
+    public static function todasEnOrden(): Collection
+    {
+        return static::enOrdenNatural(static::all());
     }
 
     /**
