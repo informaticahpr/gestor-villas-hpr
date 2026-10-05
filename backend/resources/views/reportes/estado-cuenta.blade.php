@@ -7,6 +7,8 @@
         table.estado tr { page-break-inside: avoid; }
         /* un bloque con esta clase nunca se parte: si no cabe en lo que queda de la pagina, pasa entero a la siguiente */
         .sin-corte { page-break-inside: avoid; }
+        /* linea arriba de Fecha / Descripcion / ... para separarlos del nombre de la villa */
+        table.datos tr.columnas th { border-top: 1px solid #000000; }
 @endsection
 
 @section('contenido')
@@ -40,15 +42,15 @@
                 </colgroup>
                 <thead>
                     <tr>
-                        <th colspan="3" style="font-size: 11px;">Villa #{{ $r['villa'] }} — {{ $r['propietario'] }}</th>
-                        <th colspan="2" class="der" style="font-size: 10px;">Saldo a la fecha: {{ Formato::monto($r['saldo_actual']) }}</th>
+                        <th colspan="3" style="font-size: 12px; border-bottom: none;">Villa #{{ $r['villa'] }} — {{ $r['propietario'] }}</th>
+                        <th colspan="2" class="der" style="font-size: 13px; border-bottom: none;">Saldo a la fecha: {{ Formato::monto($r['saldo_actual']) }}</th>
                     </tr>
-                    <tr>
-                        <th style="background: #b8860b;">Fecha</th>
-                        <th style="background: #b8860b;">Descripción</th>
-                        <th class="der" style="background: #b8860b;">Cargo</th>
-                        <th class="der" style="background: #b8860b;">Crédito</th>
-                        <th class="der" style="background: #b8860b;">Saldo</th>
+                    <tr class="columnas">
+                        <th>Fecha</th>
+                        <th>Descripción</th>
+                        <th class="der">Cargo</th>
+                        <th class="der">Crédito</th>
+                        <th class="der">Saldo</th>
                     </tr>
                 </thead>
                 <tbody>

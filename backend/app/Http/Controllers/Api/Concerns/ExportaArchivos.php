@@ -39,8 +39,17 @@ trait ExportaArchivos
         return NombreArchivo::armar($titulo, $villa, $fecha, $extension);
     }
 
+    /**
+     * dompdf necesita mucha memoria con reportes grandes (ej. estado de cuenta de todas las villas en
+     * varios años: ~170 MB) y el limite por defecto de PHP es 128 MB. Se sube solo mientras se genera.
+     */
+    private const MEMORIA_EXPORTACION = '1024M';
+
     protected function pdf(string $vista, array $datos, string $archivo, string $orientacion = 'portrait'): Response
     {
+        ini_set('memory_limit', self::MEMORIA_EXPORTACION);
+        set_time_limit(600);
+
         // el usuario que genera el reporte aparece en la cabecera, bajo la fecha de generacion
         $datos['usuario'] = $this->usuarioActual();
 
@@ -51,10 +60,12 @@ trait ExportaArchivos
         $dompdf = $pdf->getDomPDF();
         $canvas = $dompdf->getCanvas();
         $fuente = $dompdf->getFontMetrics()->getFont('helvetica');
-        $y = $canvas->get_height() - 30;
-        $gris = [0.42, 0.36, 0.31];
-        $canvas->page_text(36, $y, 'Hotel y Villas Palma Real', $fuente, 8, $gris);
-        $canvas->page_text($canvas->get_width() - 36 - 62, $y, 'Página {PAGE_NUM} de {PAGE_COUNT}', $fuente, 8, $gris);
+        // alineado con los margenes laterales de 3 cm (85 pt) y centrado en el margen inferior de 2.54 cm (72 pt)
+        $lado = 85;
+        $y = $canvas->get_height() - 40;
+        $gris = [0.27, 0.27, 0.27]; // gris neutro (ahorro de tinta)
+        $canvas->page_text($lado, $y, 'Hotel y Villas Palma Real', $fuente, 8, $gris);
+        $canvas->page_text($canvas->get_width() - $lado - 62, $y, 'Página {PAGE_NUM} de {PAGE_COUNT}', $fuente, 8, $gris);
 
         return $pdf->stream($archivo);
     }

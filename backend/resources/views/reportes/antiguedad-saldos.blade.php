@@ -1,6 +1,12 @@
 @extends('layouts.pdf')
 @use('App\Support\Formato')
 
+@section('estilos')
+        /* porcentajes del mismo tamaño que la fila de SALDOS de arriba */
+        table.datos tr.porcentajes td { padding: 7px 7px; font-weight: bold; font-size: 12px; }
+        table.datos tr.porcentajes td.etiqueta { text-transform: uppercase; letter-spacing: 1px; }
+@endsection
+
 @section('contenido')
     @php($buckets = ['d90mas' => '+90 días', 'd90' => '90 días', 'd60' => '60 días', 'd30' => '30 días'])
 
@@ -38,8 +44,8 @@
                     @endforeach
                     <td class="der gran-total">{{ Formato::monto($antiguedad['total_saldo']) }}</td>
                 </tr>
-                <tr class="subtotal">
-                    <td colspan="2">Porcentajes</td>
+                <tr class="porcentajes">
+                    <td colspan="2" class="etiqueta">PORCENTAJES</td>
                     @foreach ($buckets as $clave => $etiqueta)
                         <td class="der">{{ $antiguedad['porcentajes'][$clave] }}%</td>
                     @endforeach

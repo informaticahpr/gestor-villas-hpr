@@ -12,43 +12,45 @@
     <meta charset="utf-8">
     <title>{{ $titulo }}</title>
     <style>
-        @page { margin: 36px 36px 56px 36px; }
-        body { font-family: 'Helvetica', sans-serif; font-size: 10px; color: #34241a; }
+        /* margenes: 2.54 cm arriba y abajo, 3 cm a los lados (el pie de pagina se alinea con ellos, ver ExportaArchivos::pdf) */
+        @page { margin: 2.54cm 3cm 2.54cm 3cm; }
+        /* Impresion en negro y grises, sin fondos de color (ahorro de tinta). Solo el logo queda en color. */
+        body { font-family: 'Helvetica', sans-serif; font-size: 10px; color: #000000; }
 
         table { border-collapse: collapse; }
         .der { text-align: right; }
         .centro { text-align: center; }
 
         /* cabecera */
-        table.cabecera { width: 100%; margin-bottom: 16px; border-bottom: 2px solid #b8860b; }
+        table.cabecera { width: 100%; margin-bottom: 16px; border-bottom: 1.5px solid #000000; }
         table.cabecera td { vertical-align: middle; padding-bottom: 8px; }
         table.cabecera td.logo { width: 76px; }
         table.cabecera img { width: 66px; }
-        .empresa { font-size: 16px; font-weight: bold; color: #723314; text-transform: uppercase; letter-spacing: 1px; }
-        .titulo { margin-top: 3px; font-size: 12px; font-weight: bold; color: #b8860b; text-transform: uppercase; }
-        .subtitulo { margin-top: 3px; font-size: 9px; color: #6b5c4f; }
-        .generado { font-size: 8px; color: #6b5c4f; text-align: right; }
+        .empresa { font-size: 16px; font-weight: bold; color: #000000; text-transform: uppercase; letter-spacing: 1px; }
+        .titulo { margin-top: 3px; font-size: 12px; font-weight: bold; color: #000000; text-transform: uppercase; }
+        .subtitulo { margin-top: 3px; font-size: 9px; color: #444444; }
+        .generado { font-size: 8px; color: #444444; text-align: right; }
         .generado .usuario { margin-top: 2px; font-weight: bold; }
 
         /* tablas de datos */
         table.datos { width: 100%; margin-bottom: 4px; }
-        table.datos th { background: #723314; color: #ffffff; padding: 6px 7px; font-size: 9px; text-align: left; }
+        /* encabezados sin fondo (ahorran tinta): letra negra en negrita y una linea debajo */
+        table.datos th { color: #000000; font-weight: bold; padding: 6px 7px; font-size: 10px; text-align: left; border-bottom: 1px solid #000000; }
         table.datos th.der { text-align: right; }
-        table.datos td { padding: 5px 7px; border-bottom: 1px solid #eadfcf; }
-        table.datos tr.zebra td { background: #fdf4ec; }
-        table.datos tr.total td { background: #fbe7d3; border-top: 2px solid #b8860b; border-bottom: none; font-weight: bold; font-size: 11px; }
-        table.datos tr.subtotal td { font-weight: bold; color: #6b5c4f; }
-        table.datos tr.inicial td { color: #6b5c4f; font-style: italic; }
+        table.datos td { padding: 5px 7px; border-bottom: 1px solid #d0d0d0; }
+        table.datos tr.total td { border-top: 1.5px solid #000000; border-bottom: none; font-weight: bold; font-size: 11px; }
+        table.datos tr.subtotal td { font-weight: bold; color: #000000; }
+        table.datos tr.inicial td { color: #444444; font-style: italic; }
         /* fila de totales grande: Saldos Generales y Antigüedad de Saldos */
-        table.datos tr.total-grande td { background: #fbe7d3; border-top: 2px solid #b8860b; border-bottom: none; padding: 7px 7px; font-weight: bold; font-size: 12px; }
+        table.datos tr.total-grande td { border-top: 1.5px solid #000000; border-bottom: none; padding: 7px 7px; font-weight: bold; font-size: 12px; }
         table.datos tr.total-grande td.etiqueta { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
         table.datos tr.total-grande td.gran-total { font-size: 12px; }
-        /* ultima linea de cada villa en el estado de cuenta: "SALDO" (mismo tono claro que los demas totales) */
-        table.datos tr.saldo-final td { background: #fbe7d3; border-top: 2px solid #b8860b; border-bottom: 2px solid #b8860b; padding: 7px 7px; font-weight: bold; font-size: 12px; text-transform: uppercase; }
-        .obs { display: block; margin-top: 2px; font-size: 8px; color: #6b5c4f; }
-        .deuda { color: #8c1926; }
-        .favor { color: #047857; }
-        .vacio { padding: 26px 0; text-align: center; color: #6b5c4f; }
+        /* ultima linea de cada villa en el estado de cuenta: "SALDO" (sin fondo, para ahorrar tinta) */
+        table.datos tr.saldo-final td { border-top: 1.5px solid #000000; border-bottom: 1.5px solid #000000; padding: 7px 7px; font-weight: bold; font-size: 12px; text-transform: uppercase; }
+        .obs { display: block; margin-top: 2px; font-size: 8px; color: #444444; }
+        .deuda { color: #000000; }
+        .favor { color: #000000; }
+        .vacio { padding: 26px 0; text-align: center; color: #444444; }
 
         @yield('estilos')
     </style>

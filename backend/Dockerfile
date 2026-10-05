@@ -13,6 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && docker-php-ext-install -j"$(nproc)" gd zip pdo_pgsql opcache \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Limites de PHP: la imagen trae 128 MB de memoria por defecto y los PDF grandes (estado de cuenta de
+# todas las villas en varios años) necesitan mas; tambien se da mas tiempo a las exportaciones largas.
+RUN printf "memory_limit=1024M\nmax_execution_time=600\nupload_max_filesize=20M\npost_max_size=20M\n" > /usr/local/etc/php/conf.d/limites.ini
+
 # Composer (no se instala como dependencia de sistema aparte: se copia el binario oficial)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
