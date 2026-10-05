@@ -23,6 +23,7 @@ class Concepto extends Model
             'ACTIVO' => 'boolean',
             'MONTO_DEFAULT' => 'decimal:2',
             'ES_MANTENIMIENTO' => 'boolean',
+            'ES_MORA' => 'boolean',
         ];
     }
 
@@ -30,6 +31,12 @@ class Concepto extends Model
     public static function mantenimiento(): ?self
     {
         return static::where('ES_MANTENIMIENTO', true)->first();
+    }
+
+    /** El concepto con el que se cargan las moras mensuales (null si no existe). */
+    public static function mora(): ?self
+    {
+        return static::where('ES_MORA', true)->first();
     }
 
     // Incluye los anulados: siguen referenciando el concepto, asi que tambien impiden borrarlo o cambiar su tipo.

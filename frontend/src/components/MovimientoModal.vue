@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import api from '../lib/api'
+import { formatearMonto } from '../lib/format'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { useDataStore } from '../stores/data'
@@ -184,6 +185,10 @@ async function guardar() {
         OBS: form.OBS || null,
       })
       toast.success('Movimiento aplicado correctamente.')
+      // pago antes de fin de mes que cubrio todo lo adeudado: la mora del mes se anulo sola
+      if (data.mora_anulada) {
+        toast.info(`La villa pagó todo lo adeudado antes de fin de mes: se anuló su mora del mes (${data.mora_anulada.folio}, ${formatearMonto(data.mora_anulada.importe)}).`)
+      }
       abrirRecibo(data.movimiento.ID_MOV)
     }
     dataStore.tocar()

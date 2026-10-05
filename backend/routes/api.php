@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CuotaMantenimientoController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FormaPagoController;
 use App\Http\Controllers\Api\HoyController;
+use App\Http\Controllers\Api\MoraController;
 use App\Http\Controllers\Api\MovimientoController;
 use App\Http\Controllers\Api\PropietarioController;
 use App\Http\Controllers\Api\ReciboController;
@@ -55,6 +56,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN)->group(function () {
         Route::patch('/movimientos/{movimiento}/anular', [MovimientoController::class, 'anular']);
+
+        // mora mensual: porcentaje y arreglos de pago (la aplicacion es automatica: moras:aplicar)
+        Route::get('/mora/configuracion', [MoraController::class, 'configuracion']);
+        Route::put('/mora/configuracion', [MoraController::class, 'actualizarConfiguracion']);
+        Route::get('/villas/{villa}/moras', [MoraController::class, 'morasDeVilla']);
+        Route::post('/villas/{villa}/arreglo-pago', [MoraController::class, 'arregloDePago']);
 
         Route::put('/villas/{villa}', [VillaController::class, 'update']);
         Route::patch('/villas/{villa}/cuota-especial', [VillaController::class, 'actualizarCuotaEspecial']);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../lib/api'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
@@ -335,6 +335,44 @@ async function guardarCuotaMantenimiento() {
   }
 }
 
+// --- Mora mensual (porcentaje que se aplica el dia 5 sobre lo adeudado) ---
+const porcentajeMora = ref<number | null>(null) // valor guardado
+const valorMora = ref<number | null>(null) // lo que esta en el campo
+const diaMora = ref(5)
+const cargandoMora = ref(false)
+const guardandoMora = ref(false)
+
+async function cargarMora() {
+  cargandoMora.value = true
+  try {
+    const { data } = await api.get('/api/mora/configuracion')
+    porcentajeMora.value = data.porcentaje
+    valorMora.value = data.porcentaje
+    diaMora.value = data.dia
+  } catch (e: any) {
+    toast.error(mensajeDeError(e, 'No se pudo cargar el porcentaje de mora.'))
+  } finally {
+    cargandoMora.value = false
+  }
+}
+
+async function guardarMora() {
+  guardandoMora.value = true
+  try {
+    const { data } = await api.put('/api/mora/configuracion', { porcentaje: valorMora.value })
+    porcentajeMora.value = data.porcentaje
+    valorMora.value = data.porcentaje
+    toast.success(`Mora mensual actualizada a ${data.porcentaje}%.`)
+  } catch (e: any) {
+    toast.error(mensajeDeError(e, 'No se pudo guardar el porcentaje de mora.'))
+  } finally {
+    guardandoMora.value = false
+  }
+}
+
+/** Ejemplo con el porcentaje del campo: sobre una deuda de $1,000. */
+const ejemploMora = computed(() => (valorMora.value ? Math.round(1000 * valorMora.value) / 100 : 0))
+
 // --- Cuotas especiales ---
 const villasCuotaEspecial = ref<VillaResumen[]>([])
 const cargandoCuotas = ref(false)
@@ -524,6 +562,7 @@ const ENTIDADES: Array<{ value: EntidadBitacora; label: string }> = [
   { value: 'cuota_especial', label: 'Cuotas especiales' },
   { value: 'cuota_mantenimiento', label: 'Cuota de mantenimiento' },
   { value: 'movimiento', label: 'Cargos y abonos' },
+  { value: 'mora', label: 'Mora' },
 ]
 
 const ACCIONES: Array<{ value: AccionBitacora; label: string }> = [
@@ -632,6 +671,7 @@ onMounted(() => {
   cargarUsuarios()
   cargarConceptos()
   cargarCuotaMantenimiento()
+  cargarMora()
   cargarCuotasEspeciales()
   cargarFormasPago()
   cargarBitacora()
@@ -1049,6 +1089,44 @@ onMounted(() => {
             <span v-if="villasCuotaEspecial.length > 0">
               {{ villasCuotaEspecial.length }} villa{{ villasCuotaEspecial.length === 1 ? '' : 's' }} con cuota especial pagan su propio monto.
             </span>
+          </p>
+        </form>
+
+        <!-- Mora mensual -->
+        <form class="mt-6 rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm" @submit.prevent="guardarMora">
+          <p class="mb-1 font-display font-semibold text-espresso-800">Mora mensual</p>
+          <p class="mb-4 text-sm text-espresso-800/60">
+            Cada día {{ diaMora }} el sistema carga automáticamente, a las villas que deben, este porcentaje sobre todo lo
+            que deben ese día. Si la villa paga todo antes de que termine el mes, la mora de ese mes se anula sola. Con un
+            arreglo de pago, el Director puede anular moras desde la ficha de la villa.
+          </p>
+          <label class="mb-1.5 block text-sm font-medium text-espresso-700">Porcentaje de mora</label>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="relative w-32">
+              <input
+                v-model.number="valorMora"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                required
+                :disabled="cargandoMora"
+                class="w-full rounded-lg border border-espresso-800/15 bg-white py-2 pl-3 pr-7 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:bg-cream-200"
+              />
+              <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-espresso-800/40">%</span>
+            </div>
+            <button
+              type="submit"
+              :disabled="guardandoMora || cargandoMora || valorMora === porcentajeMora"
+              class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50"
+            >
+              {{ guardandoMora ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+          <p v-if="valorMora" class="mt-4 text-sm text-espresso-800/60">
+            Ejemplo: si una villa debe <strong class="text-espresso-900">$1,000.00</strong> el día {{ diaMora }}, se le cargan
+            <strong class="text-espresso-900">{{ formatearMonto(ejemploMora) }}</strong> de mora
+            (queda en {{ formatearMonto(1000 + ejemploMora) }}).
           </p>
         </form>
       </div>

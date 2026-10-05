@@ -12,6 +12,7 @@ import { abrirReporte, type FormatoExportacion } from '../lib/exportar'
 import { soloDigitos, mayusculas } from '../lib/filtrosCampo'
 import ExportarBotones from './ExportarBotones.vue'
 import ObservacionModal from './ObservacionModal.vue'
+import ArregloPagoModal from './ArregloPagoModal.vue'
 import FechaInput from './FechaInput.vue'
 import PersonaCampos from './PersonaCampos.vue'
 import { formatearFecha } from '../lib/fechaFormato'
@@ -29,6 +30,15 @@ const esEdicion = computed(() => Boolean(props.villaId))
 const editando = ref(false)
 const soloLectura = computed(() => esEdicion.value && !editando.value)
 const puedeEditar = computed(() => auth.esDirectorOAdmin())
+
+/** Arreglo de pago (Director/Admin): anular moras de la villa */
+const mostrarArreglo = ref(false)
+
+async function arregloAplicado() {
+  mostrarArreglo.value = false
+  dataStore.tocar()
+  await cargar()
+}
 
 type Pestana = 'propietario' | 'encargado' | 'villa' | 'reporte' | 'historial'
 const tab = ref<Pestana>('propietario')
@@ -626,7 +636,16 @@ const claseCheck = 'h-4 w-4 rounded border-espresso-800/25 text-brand-600 focus:
 
         <!-- ======================= Reporte ======================= -->
         <div v-else-if="tab === 'reporte'">
-          <div class="mb-3 flex justify-end gap-2">
+          <div class="mb-3 flex flex-wrap justify-end gap-2">
+            <button
+              v-if="puedeEditar"
+              type="button"
+              class="rounded-lg border border-wine-500/30 px-3 py-1.5 text-sm font-medium text-wine-600 hover:bg-wine-500/5"
+              title="Anular moras de esta villa por un arreglo de pago"
+              @click="mostrarArreglo = true"
+            >
+              Arreglo de pago
+            </button>
             <ExportarBotones @exportar="exportarReporte" />
           </div>
           <table class="min-w-full divide-y divide-gold-300/20 text-sm">
@@ -784,6 +803,7 @@ const claseCheck = 'h-4 w-4 rounded border-espresso-800/25 text-brand-600 focus:
     </div>
 
     <ObservacionModal v-if="movimientoDetalle" :movimiento="movimientoDetalle" @close="movimientoDetalle = null" />
+    <ArregloPagoModal v-if="mostrarArreglo && villaId" :villa-id="villaId" @close="mostrarArreglo = false" @aplicado="arregloAplicado" />
   </div>
   </Teleport>
 </template>

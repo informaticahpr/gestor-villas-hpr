@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 // ANULADO_EN, ANULADO_POR y MOTIVO_ANULACION no son asignables en masa: solo los fija anular().
 #[Fillable([
     'CLV_CLIE', 'NUM_CPTO', 'FORMA_PAGO_ID', 'IMPORTE', 'FECHA_APLI', 'FECHA_VENC',
-    'ANIO', 'MES', 'REFER', 'OBS', 'USUARIO_ID', 'FOLIO',
+    'ANIO', 'MES', 'REFER', 'OBS', 'USUARIO_ID', 'FOLIO', 'MORA_PERIODO',
 ])]
 class Movimiento extends Model
 {
@@ -54,10 +54,11 @@ class Movimiento extends Model
         return $this->ANULADO_EN !== null;
     }
 
-    public function anular(User $usuario, string $motivo): void
+    /** $usuario null = lo anulo el sistema (ej. mora que se anula sola al pagar antes de fin de mes). */
+    public function anular(?User $usuario, string $motivo): void
     {
         $this->ANULADO_EN = now();
-        $this->ANULADO_POR = $usuario->id;
+        $this->ANULADO_POR = $usuario?->id;
         $this->MOTIVO_ANULACION = $motivo;
         $this->save();
     }

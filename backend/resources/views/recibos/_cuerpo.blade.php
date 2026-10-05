@@ -8,7 +8,7 @@
         <div class="anulado">
             <div class="sello">ANULADO</div>
             <div class="detalle">
-                Anulado por {{ $movimiento->anuladoPor->name ?? '—' }} el {{ $movimiento->ANULADO_EN->format('d/m/Y H:i') }}.
+                Anulado por {{ $movimiento->anuladoPor->name ?? 'Sistema' }} el {{ $movimiento->ANULADO_EN->format('d/m/Y H:i') }}.
                 Motivo: {{ $movimiento->MOTIVO_ANULACION }}
             </div>
         </div>

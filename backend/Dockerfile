@@ -33,9 +33,11 @@ RUN composer dump-autoload --optimize --no-dev \
 
 EXPOSE 8000
 
-# Al arrancar: cachea config/rutas, aplica migraciones pendientes (no destruye datos) y sirve.
+# Al arrancar: cachea config/rutas, aplica migraciones pendientes (no destruye datos), arranca en
+# segundo plano el programador de tareas (aplica la mora mensual el dia 5, ver routes/console.php) y sirve.
 # `php artisan serve` es de un solo proceso -- suficiente para pruebas, no para carga real.
 CMD php artisan config:cache \
     && php artisan route:cache \
     && php artisan migrate --force \
+    && (php artisan schedule:work &) \
     && php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"

@@ -8,6 +8,7 @@ use App\Models\Concepto;
 use App\Models\Movimiento;
 use App\Models\Villa;
 use App\Services\FolioService;
+use App\Services\MoraService;
 use App\Services\SaldoService;
 use App\Support\Formato;
 use App\Support\Paginacion;
@@ -21,6 +22,7 @@ class MovimientoController extends Controller
     public function __construct(
         private readonly SaldoService $saldoService,
         private readonly FolioService $folioService,
+        private readonly MoraService $moraService,
     ) {}
 
     /**
@@ -83,7 +85,7 @@ class MovimientoController extends Controller
                 'observacion' => $m->OBS,
                 'anulado' => $m->anulado(),
                 'anulado_en' => $m->ANULADO_EN?->toIso8601String(),
-                'anulado_por' => $m->anulado() ? ($m->anuladoPor?->name ?? '—') : null,
+                'anulado_por' => $m->anulado() ? ($m->anuladoPor?->name ?? 'Sistema') : null,
                 'motivo_anulacion' => $m->MOTIVO_ANULACION,
             ]),
             'meta' => [
@@ -160,9 +162,13 @@ class MovimientoController extends Controller
 
         $this->saldoService->recalcularSaldo($villa);
 
+        // un pago antes de fin de mes que cubre todo lo adeudado anula sola la mora de ese mes
+        $moraAnulada = $concepto->ES_CARGO ? null : $this->moraService->anularSiPagoAntesDeFinDeMes($villa, $fecha);
+
         return response()->json([
             'movimiento' => $movimiento->load('concepto', 'formaPago'),
-            'saldo_villa' => (float) $villa->SALDO,
+            'saldo_villa' => (float) $villa->refresh()->SALDO,
+            'mora_anulada' => $moraAnulada ? ['folio' => $moraAnulada->FOLIO, 'importe' => (float) $moraAnulada->IMPORTE] : null,
         ], 201);
     }
 
