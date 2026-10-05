@@ -46,7 +46,7 @@ const iconConfig =
         <RouterLink :to="{ name: 'home' }" class="flex items-center gap-3">
           <img src="/logo.png" alt="Palma Real Hotel y Villas" class="h-16 w-auto" />
           <span class="hidden whitespace-nowrap border-l border-espresso-800/15 pl-3 font-display text-xl font-semibold tracking-wide text-espresso-800 sm:block">
-            Gestor de Villas
+            Administrador de Villas
           </span>
         </RouterLink>
 

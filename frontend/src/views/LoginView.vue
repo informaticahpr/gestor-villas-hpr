@@ -47,7 +47,7 @@ async function onSubmit() {
 
       <div class="rounded-2xl border border-gold-300/30 bg-cream-50 p-8 shadow-xl shadow-brand-900/5">
         <h1 class="mb-1 text-center font-display text-xl font-semibold text-espresso-800">
-          Gestor de Villas
+          Administrador de Villas
         </h1>
         <p class="mb-6 text-center text-sm text-espresso-800/60">Inicia sesión para continuar</p>
 
