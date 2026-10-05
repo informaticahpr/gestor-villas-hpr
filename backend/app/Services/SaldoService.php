@@ -80,7 +80,10 @@ class SaldoService
 
         $movimientos = Movimiento::with('concepto')
             ->where('CLV_CLIE', $villa->CLV_CLIE)
-            ->whereBetween('FECHA_APLI', [$desde, $hasta])
+            // por dia (whereDate): en SQLite la fecha puede estar guardada con o sin hora, y un
+            // whereBetween dejaba fuera el primer o el ultimo dia del rango
+            ->whereDate('FECHA_APLI', '>=', $desde->toDateString())
+            ->whereDate('FECHA_APLI', '<=', $hasta->toDateString())
             ->orderBy('FECHA_APLI')
             ->orderBy('ID_MOV')
             ->get();

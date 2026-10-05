@@ -34,7 +34,8 @@ class DashboardController extends Controller
         // funciones de fecha distintas entre PostgreSQL y otros motores.
         $movimientos = Movimiento::query()
             ->join('conceptos', 'conceptos.NUM_CPTO', '=', 'movimientos.NUM_CPTO')
-            ->whereBetween('movimientos.FECHA_APLI', [$hoy->copy()->startOfYear(), $hoy])
+            ->whereDate('movimientos.FECHA_APLI', '>=', $hoy->copy()->startOfYear()->toDateString())
+            ->whereDate('movimientos.FECHA_APLI', '<=', $hoy->toDateString())
             ->get(['movimientos.FECHA_APLI', 'movimientos.IMPORTE', 'conceptos.ES_CARGO']);
 
         $meses = collect(range(1, $hoy->month))->mapWithKeys(fn ($m) => [$m => ['mes' => $m, 'cxc' => 0.0, 'recuperado' => 0.0]])->all();

@@ -189,7 +189,10 @@ class ReporteController extends Controller
 
         $filas = Movimiento::with(['villa', 'formaPago'])
             ->where('NUM_CPTO', $concepto->NUM_CPTO)
-            ->whereBetween('FECHA_APLI', [$desde->toDateString(), $hasta->toDateString()])
+            // whereDate y no whereBetween con texto: en SQLite la fecha puede venir guardada con hora
+            // ("2026-10-05 00:00:00") y se quedaba fuera el ultimo dia del rango
+            ->whereDate('FECHA_APLI', '>=', $desde->toDateString())
+            ->whereDate('FECHA_APLI', '<=', $hasta->toDateString())
             ->when($villa, fn ($q) => $q->where('CLV_CLIE', $villa))
             ->orderBy('FECHA_APLI')
             ->orderBy('ID_MOV')
