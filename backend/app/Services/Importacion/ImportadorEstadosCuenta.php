@@ -43,7 +43,15 @@ class ImportadorEstadosCuenta
         self::AJUSTE_CREDITO => false,
     ];
 
-    private const MANTENIMIENTO = '__mantenimiento__';
+    public const MANTENIMIENTO = '__mantenimiento__';
+
+    /**
+     * Cargos de energia electrica: van al concepto "Energía Eléctrica" (creado por el usuario). Se busca
+     * sin distinguir mayusculas ni tildes; si no existe, la importacion lo crea con este nombre.
+     */
+    public const ENERGIA = '__energia__';
+
+    private const NOMBRE_ENERGIA = 'Energía Eléctrica';
 
     /** Numeros de documento de la columna A (se guardan en la observacion del movimiento). */
     private const REGEX_DOCUMENTO = '/^(fac\w*|fc|rec\w*|recibo|re|en\s*cta|em\s*cta|pgo|pag|nc|nd|ck|chq|trans|s\/r|cxc)\b|^\d/i';
@@ -250,6 +258,9 @@ class ImportadorEstadosCuenta
         if (preg_match('/\bmora\b|recargo|inter[eé]s/u', $d)) {
             return 'Mora';
         }
+        if (preg_match('/energ|el[eé]ctric|\benee\b/u', $d)) {
+            return self::ENERGIA;
+        }
         if (preg_match('/mant[ei]n|cuota/u', $d)) {
             return self::MANTENIMIENTO;
         }
@@ -364,7 +375,14 @@ class ImportadorEstadosCuenta
         }
         $mantenimiento = Concepto::mantenimiento() ?? throw new \RuntimeException('No existe el concepto de cuota de mantenimiento.');
 
-        return Concepto::pluck('NUM_CPTO', 'DESCR')->all() + [self::MANTENIMIENTO => $mantenimiento->NUM_CPTO];
+        $sinTildes = fn (string $s) => strtr(mb_strtolower(trim($s)), ['á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u']);
+        $energia = Concepto::all()->first(fn (Concepto $c) => $sinTildes($c->DESCR) === $sinTildes(self::NOMBRE_ENERGIA))
+            ?? Concepto::create(['DESCR' => self::NOMBRE_ENERGIA, 'ES_CARGO' => true, 'ACTIVO' => true]);
+
+        return Concepto::pluck('NUM_CPTO', 'DESCR')->all() + [
+            self::MANTENIMIENTO => $mantenimiento->NUM_CPTO,
+            self::ENERGIA => $energia->NUM_CPTO,
+        ];
     }
 
     private function textoBitacora(array $plan): string
@@ -378,36 +396,50 @@ class ImportadorEstadosCuenta
 
     // ------------------------------------------------------------------------------ script SQL (Railway)
 
-    /** Script para PostgreSQL (DBeaver): todo en una transaccion; si una villa ya existe, no carga nada. */
+    /**
+     * Script para PostgreSQL (DBeaver). BORRA todas las villas, propietarios, encargados, historial y
+     * movimientos (y reinicia los folios) y vuelve a cargar todo desde el Excel. Todo va en una sola
+     * transaccion: si algo falla, no se borra ni se carga nada.
+     */
     public function sql(array $plan): string
     {
         $q = fn (?string $s) => $s === null ? 'NULL' : "'".str_replace("'", "''", $s)."'";
         $n = fn ($x) => $x === null ? 'NULL' : number_format((float) $x, 2, '.', '');
         $codigos = implode(', ', array_map($q, array_keys($plan['villas'])));
+        // comparacion sin mayusculas ni tildes, para encontrar "Energía Eléctrica" aunque se haya escrito distinto
+        $normalizado = fn (string $columna) => "lower(translate({$columna}, 'ÁÉÍÓÚáéíóú', 'AEIOUaeiou'))";
+        $energia = "(SELECT \"NUM_CPTO\" FROM conceptos WHERE {$normalizado('"DESCR"')} = 'energia electrica' ORDER BY \"NUM_CPTO\" LIMIT 1)";
 
         $s = [];
         $s[] = '-- Importacion de estados de cuenta desde Excel. Generado '.now()->format('d/m/Y H:i').'.';
-        $s[] = '-- Ejecutar completo en DBeaver con Alt+X. Si algo falla, no se carga nada (ROLLBACK).';
+        $s[] = '-- ATENCION: BORRA todas las villas, propietarios, encargados, historial y movimientos y los vuelve a cargar.';
+        $s[] = '-- Ejecutar completo en DBeaver con Alt+X. Si algo falla, no se borra ni se carga nada (ROLLBACK).';
         $s[] = 'BEGIN;';
         $s[] = 'SET LOCAL search_path TO public;';
-        $s[] = "DO \$\$ BEGIN IF EXISTS (SELECT 1 FROM villas WHERE \"CLV_CLIE\" IN ({$codigos})) THEN RAISE EXCEPTION 'Algunas villas ya existen; no se importa nada.'; END IF; END \$\$;";
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'villas' AND column_name = 'OBSERVACION') THEN RAISE EXCEPTION 'Railway todavía no tiene la última versión del sistema (falta la columna OBSERVACION de villas). Espera a que termine el despliegue y vuelve a correr el script.'; END IF; END \$\$;";
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM conceptos WHERE \"ES_MANTENIMIENTO\" = true) THEN RAISE EXCEPTION 'No existe el concepto de cuota de mantenimiento.'; END IF; END \$\$;";
+        $s[] = '';
+        $s[] = '-- limpieza: se borra todo lo de villas y se reinician los folios';
+        $s[] = 'TRUNCATE TABLE movimientos, villa_historial, encargados, villas, propietarios RESTART IDENTITY;';
+        $s[] = "UPDATE folio_counters SET siguiente = 1 WHERE tipo IN ('CA', 'CR');";
         $s[] = '';
         $s[] = '-- conceptos que usa la importacion (inactivos si son propios de la importacion)';
         foreach (self::CONCEPTOS_IMPORTACION + ['Cargo extraordinario' => true, 'Mora' => true, 'Abono / Pago' => false] as $descr => $esCargo) {
             $activo = array_key_exists($descr, self::CONCEPTOS_IMPORTACION) ? 'false' : 'true';
             $s[] = "INSERT INTO conceptos (\"DESCR\", \"ES_CARGO\", \"ACTIVO\", \"ES_MANTENIMIENTO\") SELECT {$q($descr)}, ".($esCargo ? 'true' : 'false').", {$activo}, false WHERE NOT EXISTS (SELECT 1 FROM conceptos WHERE \"DESCR\" = {$q($descr)});";
         }
+        $s[] = "INSERT INTO conceptos (\"DESCR\", \"ES_CARGO\", \"ACTIVO\", \"ES_MANTENIMIENTO\") SELECT {$q(self::NOMBRE_ENERGIA)}, true, true, false WHERE NOT EXISTS (SELECT 1 FROM conceptos WHERE {$normalizado('"DESCR"')} = 'energia electrica');";
         $s[] = '';
         $s[] = 'CREATE TEMP TABLE imp_prop (clave text PRIMARY KEY, id bigint) ON COMMIT DROP;';
         foreach ($plan['propietarios'] as $clave => $p) {
             $s[] = "WITH ins AS (INSERT INTO propietarios (\"NOMBRES\", \"APELLIDOS\", created_at, updated_at) VALUES ({$q($p['NOMBRES'])}, {$q($p['APELLIDOS'])}, now(), now()) RETURNING id) INSERT INTO imp_prop SELECT {$q($clave)}, id FROM ins;";
         }
 
-        $concepto = fn (string $c) => $c === self::MANTENIMIENTO
-            ? '(SELECT "NUM_CPTO" FROM conceptos WHERE "ES_MANTENIMIENTO" = true ORDER BY "NUM_CPTO" LIMIT 1)'
-            : "(SELECT \"NUM_CPTO\" FROM conceptos WHERE \"DESCR\" = {$q($c)} ORDER BY \"NUM_CPTO\" LIMIT 1)";
+        $concepto = fn (string $c) => match ($c) {
+            self::MANTENIMIENTO => '(SELECT "NUM_CPTO" FROM conceptos WHERE "ES_MANTENIMIENTO" = true ORDER BY "NUM_CPTO" LIMIT 1)',
+            self::ENERGIA => $energia,
+            default => "(SELECT \"NUM_CPTO\" FROM conceptos WHERE \"DESCR\" = {$q($c)} ORDER BY \"NUM_CPTO\" LIMIT 1)",
+        };
 
         foreach ($plan['villas'] as $v) {
             $s[] = '';

@@ -155,10 +155,10 @@ class ImportarEstadosCuenta extends Command
         }
         $saldo = 0;
         $this->table(['Fecha', 'Concepto', 'Forma', 'Cargo', 'Crédito', 'Saldo', 'Observación'], array_map(function ($m) use (&$saldo) {
-            $esCargo = in_array($m['concepto'], [ImportadorEstadosCuenta::SALDO_INICIAL, ImportadorEstadosCuenta::AJUSTE_CARGO, 'Cargo extraordinario', 'Mora', '__mantenimiento__'], true);
+            $esCargo = in_array($m['concepto'], [ImportadorEstadosCuenta::SALDO_INICIAL, ImportadorEstadosCuenta::AJUSTE_CARGO, 'Cargo extraordinario', 'Mora', ImportadorEstadosCuenta::MANTENIMIENTO, ImportadorEstadosCuenta::ENERGIA], true);
             $saldo += $esCargo ? $m['importe'] : -$m['importe'];
 
-            return [$m['fecha'], $m['concepto'] === '__mantenimiento__' ? 'Cuota de mantenimiento' : $m['concepto'], $m['forma'] ?? '',
+            return [$m['fecha'], match ($m['concepto']) { ImportadorEstadosCuenta::MANTENIMIENTO => 'Cuota de mantenimiento', ImportadorEstadosCuenta::ENERGIA => 'Energía Eléctrica', default => $m['concepto'] }, $m['forma'] ?? '',
                 $esCargo ? number_format($m['importe'], 2) : '', $esCargo ? '' : number_format($m['importe'], 2), number_format($saldo, 2), mb_substr($m['obs'], 0, 60)];
         }, $v['movimientos']));
     }
