@@ -151,7 +151,7 @@ async function guardar() {
     toast.warning('Indica la fecha de vencimiento del cargo.')
     return
   }
-  if (form.FECHA_VENC && form.FECHA_VENC < hoyISO.value) {
+  if (tipo.value === 'cargo' && form.FECHA_VENC && form.FECHA_VENC < hoyISO.value) {
     toast.warning('La fecha de vencimiento no puede ser anterior a hoy.')
     return
   }
@@ -179,7 +179,8 @@ async function guardar() {
         NUM_CPTO: form.NUM_CPTO,
         FORMA_PAGO_ID: tipo.value === 'credito' ? form.FORMA_PAGO_ID : null,
         IMPORTE: form.IMPORTE,
-        FECHA_VENC: form.FECHA_VENC || null,
+        // los creditos/abonos no llevan vencimiento (solo sirve para la antiguedad de los cargos)
+        FECHA_VENC: tipo.value === 'cargo' ? form.FECHA_VENC || null : null,
         OBS: form.OBS || null,
       })
       toast.success('Movimiento aplicado correctamente.')
@@ -279,10 +280,11 @@ useEscapeKey(() => emit('close'))
             />
             <p class="mt-1 text-xs text-espresso-800/50">La fija el sistema (hoy).</p>
           </div>
-          <div>
+          <!-- solo en cargos: en un credito/abono el vencimiento no tiene efecto y solo confundiria -->
+          <div v-if="tipo === 'cargo'">
             <label class="mb-1.5 block text-sm font-medium text-espresso-700">
               Fecha de vencimiento
-              <span v-if="tipo === 'cargo'" class="text-wine-600" title="Obligatoria en los cargos">*</span>
+              <span class="text-wine-600" title="Obligatoria en los cargos">*</span>
             </label>
             <FechaInput v-model="form.FECHA_VENC" :min="hoyISO" :required="tipo === 'cargo'" class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
           </div>

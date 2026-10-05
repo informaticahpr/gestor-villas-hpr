@@ -144,6 +144,11 @@ class MovimientoController extends Controller
 
         $data['IMPORTE'] = $this->montoParaConcepto($concepto, $villa, (float) $data['IMPORTE']);
 
+        // los creditos/abonos no llevan vencimiento: solo sirve para la antiguedad de los cargos
+        if (! $concepto->ES_CARGO) {
+            $data['FECHA_VENC'] = null;
+        }
+
         $movimiento = Movimiento::create([
             ...$data,
             'FECHA_APLI' => $fecha->toDateString(),
