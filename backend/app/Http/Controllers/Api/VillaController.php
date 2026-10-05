@@ -330,6 +330,7 @@ class VillaController extends Controller
             'villa.NOMED' => ['nullable', 'string', 'max:20'],
             'villa.CLAVE_CATASTRAL' => ['nullable', 'string', 'max:40'],
             'villa.DESCRIPCION_IP' => ['nullable', 'string', 'max:255'],
+            'villa.OBSERVACION' => ['nullable', 'string', 'max:500'],
             'villa.NOHAB' => ['nullable', 'integer', 'min:0'],
             'villa.NOBATH' => ['nullable', 'integer', 'min:0'],
             'villa.APLICOBRO' => ['boolean'],
@@ -358,6 +359,7 @@ class VillaController extends Controller
             'villa.NOMED.max' => 'El medidor ENEE no puede superar los 20 caracteres.',
             'villa.CLAVE_CATASTRAL.max' => 'La clave catastral no puede superar los 40 caracteres.',
             'villa.DESCRIPCION_IP.max' => 'La descripción IP no puede superar los 255 caracteres.',
+            'villa.OBSERVACION.max' => 'La observación de la villa no puede superar los 500 caracteres.',
             'villa.NOHAB.integer' => 'El número de habitaciones debe ser un número entero.',
             'villa.NOHAB.min' => 'El número de habitaciones no puede ser negativo.',
             'villa.NOBATH.integer' => 'El número de baños debe ser un número entero.',
@@ -409,7 +411,7 @@ class VillaController extends Controller
         $encargado = $normalizarPersona($data['encargado'] ?? []);
 
         $villa = $data['villa'];
-        foreach (['DIR', 'NOMED', 'CLAVE_CATASTRAL', 'DESCRIPCION_IP'] as $c) {
+        foreach (['DIR', 'NOMED', 'CLAVE_CATASTRAL', 'DESCRIPCION_IP', 'OBSERVACION'] as $c) {
             if (array_key_exists($c, $villa)) {
                 $villa[$c] = $mayus($villa[$c]);
             }
@@ -446,6 +448,7 @@ class VillaController extends Controller
                 'NOMED' => $villa->NOMED,
                 'CLAVE_CATASTRAL' => $villa->CLAVE_CATASTRAL,
                 'DESCRIPCION_IP' => $villa->DESCRIPCION_IP,
+                'OBSERVACION' => $villa->OBSERVACION,
                 'NOHAB' => $villa->NOHAB,
                 'NOBATH' => $villa->NOBATH,
                 'APLICOBRO' => (bool) $villa->APLICOBRO,

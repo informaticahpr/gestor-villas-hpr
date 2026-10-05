@@ -42,6 +42,8 @@ export interface DatosVilla {
   NOMED: string | null
   CLAVE_CATASTRAL: string | null
   DESCRIPCION_IP: string | null
+  /** Observacion libre (ej. a nombre de quienes esta la villa) */
+  OBSERVACION: string | null
   NOHAB: number | null
   NOBATH: number | null
   APLICOBRO: boolean

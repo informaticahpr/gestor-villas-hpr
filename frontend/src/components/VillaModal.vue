@@ -127,6 +127,7 @@ const villa = reactive({
   NOMED: '',
   CLAVE_CATASTRAL: '',
   DESCRIPCION_IP: '',
+  OBSERVACION: '',
   NOHAB: '',
   NOBATH: '',
   APLICOBRO: true,
@@ -198,6 +199,7 @@ async function cargar() {
       NOMED: v.villa.NOMED ?? '',
       CLAVE_CATASTRAL: v.villa.CLAVE_CATASTRAL ?? '',
       DESCRIPCION_IP: v.villa.DESCRIPCION_IP ?? '',
+      OBSERVACION: v.villa.OBSERVACION ?? '',
       NOHAB: v.villa.NOHAB?.toString() ?? '',
       NOBATH: v.villa.NOBATH?.toString() ?? '',
       APLICOBRO: v.villa.APLICOBRO,
@@ -585,6 +587,17 @@ const claseCheck = 'h-4 w-4 rounded border-espresso-800/25 text-brand-600 focus:
                     maxlength="255"
                     :class="[claseInput, 'resize-none']"
                     @input="villa.DESCRIPCION_IP = mayusculas(valor($event))"
+                  />
+                </div>
+                <div class="sm:col-span-2">
+                  <label :class="claseLabel">Observación de la villa</label>
+                  <textarea
+                    :value="villa.OBSERVACION"
+                    rows="2"
+                    maxlength="500"
+                    placeholder="VILLA A NOMBRE DE JUAN PÉREZ / MARÍA LÓPEZ"
+                    :class="[claseInput, 'resize-none']"
+                    @input="villa.OBSERVACION = mayusculas(valor($event))"
                   />
                 </div>
                 <div>

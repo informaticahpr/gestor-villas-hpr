@@ -90,7 +90,16 @@ class ImportadorEstadosCuenta
                 $villa['avisos'][] = 'No está en la lista de propietarios: se usa el nombre del Excel ("'.$lista[0]['propietario'].'").';
             }
             usort($lista, fn ($x, $y) => strcmp((string) $x['desde'], (string) $y['desde']));
-            $personas = array_map(fn ($p) => $this->persona($p['propietario']) + ['desde' => $p['desde'] ?: null], $lista);
+
+            // "Victor Gonzales / Luisa Reyes" o "Magaly Martinez y Jorge Max": la villa esta a nombre de
+            // varias personas. El propietario registrado es el primero y en la observacion de la villa se
+            // anota a nombre de quienes esta.
+            $nombres = fn (string $texto) => array_values(array_filter(array_map('trim', preg_split('/\s*\/\s*|\s+y\s+/iu', $texto))));
+            $titulares = $nombres(end($lista)['propietario']);
+            $villa['observacion'] = count($titulares) > 1
+                ? 'VILLA A NOMBRE DE: '.mb_strtoupper(implode(' / ', $titulares), 'UTF-8')
+                : null;
+            $personas = array_map(fn ($p) => $this->persona($nombres($p['propietario'])[0]) + ['desde' => $p['desde'] ?: null], $lista);
 
             $actual = array_pop($personas);
             $catalogoPropietarios[$actual['clave']] ??= $actual;
@@ -99,7 +108,11 @@ class ImportadorEstadosCuenta
             $villa['anteriores'] = [];
             foreach ($personas as $i => $p) {
                 $siguiente = $personas[$i + 1] ?? $actual;
-                $villa['anteriores'][] = $p + ['hasta' => $siguiente['desde'] ?? $hoy->toDateString()];
+                if (! $siguiente['desde']) {
+                    // no se sabe cuando cambio: se deja la fecha de corte (el ultimo dato "viejo" del Excel)
+                    $villa['avisos'][] = "No se sabe la fecha en que {$p['clave']} dejó de ser propietario: en el historial queda hasta el ".Carbon::parse($corte)->format('d/m/Y').'.';
+                }
+                $villa['anteriores'][] = $p + ['hasta' => $siguiente['desde'] ?? $corte];
             }
 
             $villas[$codigo] = $villa;
@@ -317,7 +330,7 @@ class ImportadorEstadosCuenta
 
             foreach ($plan['villas'] as $v) {
                 Villa::create([
-                    'CLV_CLIE' => $v['codigo'], 'PROPIETARIO_ID' => $idPropietario[$v['propietario']], 'DIR' => $v['dir'],
+                    'CLV_CLIE' => $v['codigo'], 'PROPIETARIO_ID' => $idPropietario[$v['propietario']], 'DIR' => $v['dir'], 'OBSERVACION' => $v['observacion'],
                     'APLICOBRO' => true, 'CUOTA_ESPECIAL' => false, 'SALDO' => $v['saldo_final'],
                 ]);
                 foreach ($v['anteriores'] as $a) {
@@ -378,6 +391,7 @@ class ImportadorEstadosCuenta
         $s[] = 'BEGIN;';
         $s[] = 'SET LOCAL search_path TO public;';
         $s[] = "DO \$\$ BEGIN IF EXISTS (SELECT 1 FROM villas WHERE \"CLV_CLIE\" IN ({$codigos})) THEN RAISE EXCEPTION 'Algunas villas ya existen; no se importa nada.'; END IF; END \$\$;";
+        $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'villas' AND column_name = 'OBSERVACION') THEN RAISE EXCEPTION 'Railway todavía no tiene la última versión del sistema (falta la columna OBSERVACION de villas). Espera a que termine el despliegue y vuelve a correr el script.'; END IF; END \$\$;";
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM conceptos WHERE \"ES_MANTENIMIENTO\" = true) THEN RAISE EXCEPTION 'No existe el concepto de cuota de mantenimiento.'; END IF; END \$\$;";
         $s[] = '';
         $s[] = '-- conceptos que usa la importacion (inactivos si son propios de la importacion)';
@@ -398,7 +412,7 @@ class ImportadorEstadosCuenta
         foreach ($plan['villas'] as $v) {
             $s[] = '';
             $s[] = "-- {$v['codigo']} ({$v['titulo']})";
-            $s[] = "INSERT INTO villas (\"CLV_CLIE\", \"PROPIETARIO_ID\", \"DIR\", \"APLICOBRO\", \"CUOTA_ESPECIAL\", \"SALDO\", created_at, updated_at) VALUES ({$q($v['codigo'])}, (SELECT id FROM imp_prop WHERE clave = {$q($v['propietario'])}), {$q($v['dir'])}, true, false, {$n($v['saldo_final'])}, now(), now());";
+            $s[] = "INSERT INTO villas (\"CLV_CLIE\", \"PROPIETARIO_ID\", \"DIR\", \"OBSERVACION\", \"APLICOBRO\", \"CUOTA_ESPECIAL\", \"SALDO\", created_at, updated_at) VALUES ({$q($v['codigo'])}, (SELECT id FROM imp_prop WHERE clave = {$q($v['propietario'])}), {$q($v['dir'])}, {$q($v['observacion'])}, true, false, {$n($v['saldo_final'])}, now(), now());";
             foreach ($v['anteriores'] as $a) {
                 $s[] = "INSERT INTO villa_historial (\"CLV_CLIE\", \"TIPO\", \"NOMBRES\", \"APELLIDOS\", \"DESDE\", \"HASTA\", created_at, updated_at) VALUES ({$q($v['codigo'])}, 'propietario', {$q($a['NOMBRES'])}, {$q($a['APELLIDOS'])}, {$q($a['desde'])}, {$q($a['hasta'])}, now(), now());";
             }

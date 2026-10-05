@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * en Encargado. Columnas heredadas: DIR = ubicacion, FCONTRUC = fecha de entrega, NOMED = medidor ENEE.
  */
 #[Fillable([
-    'CLV_CLIE', 'PROPIETARIO_ID', 'DIR', 'FCONTRUC', 'NOMED', 'CLAVE_CATASTRAL', 'DESCRIPCION_IP',
+    'CLV_CLIE', 'PROPIETARIO_ID', 'DIR', 'FCONTRUC', 'NOMED', 'CLAVE_CATASTRAL', 'DESCRIPCION_IP', 'OBSERVACION',
     'NOHAB', 'NOBATH', 'APLICOBRO', 'CUOTA_ESPECIAL', 'MONTO_CUOTA_ESPECIAL', 'SALDO',
 ])]
 class Villa extends Model
