@@ -1,5 +1,5 @@
 {{--
-    Base de todos los PDF del sistema (reportes y recibos): logo, nombre del hotel, titulo,
+    Base de todos los PDF del sistema (reportes y recibos): logo, titulo,
     fecha de generacion y usuario que lo genera. Variables: $titulo, $usuario y, opcional, $subtitulo.
     Las plantillas hijas llenan la seccion "contenido" y, si necesitan CSS propio, "estilos".
 --}}
@@ -22,20 +22,21 @@
         .centro { text-align: center; }
 
         /* cabecera */
-        table.cabecera { width: 100%; margin-bottom: 16px; border-bottom: 1.5px solid #000000; }
+        /* sin margen abajo: la fila de titulos de columnas queda centrada entre esta linea y la suya */
+        table.cabecera { width: 100%; border-bottom: 1.5px solid #000000; }
         table.cabecera td { vertical-align: middle; padding-bottom: 8px; }
-        table.cabecera td.logo { width: 76px; }
-        table.cabecera img { width: 66px; }
-        .empresa { font-size: 16px; font-weight: bold; color: #000000; text-transform: uppercase; letter-spacing: 1px; }
-        .titulo { margin-top: 3px; font-size: 12px; font-weight: bold; color: #000000; text-transform: uppercase; }
-        .subtitulo { margin-top: 3px; font-size: 9px; color: #444444; }
-        .generado { font-size: 8px; color: #444444; text-align: right; }
+        /* logo de 3 cm (ya trae el nombre del hotel, por eso no se repite en texto) */
+        table.cabecera td.logo { width: 3.4cm; }
+        table.cabecera img { width: 3cm; }
+        .titulo { font-size: 20px; font-weight: bold; color: #000000; text-transform: uppercase; letter-spacing: 1px; }
+        .subtitulo { margin-top: 5px; font-size: 12px; color: #444444; }
+        .generado { font-size: 9px; color: #444444; text-align: right; }
         .generado .usuario { margin-top: 2px; font-weight: bold; }
 
         /* tablas de datos */
         table.datos { width: 100%; margin-bottom: 4px; }
         /* encabezados sin fondo (ahorran tinta): letra negra en negrita y una linea debajo */
-        table.datos th { color: #000000; font-weight: bold; padding: 6px 7px; font-size: 10px; text-align: left; border-bottom: 1px solid #000000; }
+        table.datos th { color: #000000; font-weight: bold; padding: 7px 7px; font-size: 11.5px; line-height: 13px; vertical-align: middle; text-align: left; border-bottom: 1px solid #000000; }
         table.datos th.der { text-align: right; }
         table.datos td { padding: 5px 7px; border-bottom: 1px solid #d0d0d0; }
         table.datos tr.total td { border-top: 1.5px solid #000000; border-bottom: none; font-weight: bold; font-size: 11px; }

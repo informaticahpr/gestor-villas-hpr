@@ -648,7 +648,7 @@ const claseCheck = 'h-4 w-4 rounded border-espresso-800/25 text-brand-600 focus:
                 v-for="(m, i) in estadoCuenta?.movimientos ?? []"
                 :key="i"
                 tabindex="0"
-                title="Ver detalle y recibo"
+                title="Ver detalle y documento"
                 class="cursor-pointer hover:bg-brand-50/50 focus:bg-brand-50/50 focus:outline-none"
                 @click="movimientoDetalle = m"
                 @keydown.enter="movimientoDetalle = m"

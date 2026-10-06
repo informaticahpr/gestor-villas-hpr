@@ -2,7 +2,7 @@
 @use('App\Support\Formato')
 
 @section('estilos')
-        /* anchos en % (suman 100): fecha, folio y villa justos; la descripcion con el resto */
+        /* anchos en % (suman 100): fecha, correlativo y villa justos; la descripcion con el resto */
         table.concepto { table-layout: fixed; }
 @endsection
 
@@ -11,7 +11,7 @@
         <thead>
             <tr>
                 <th style="width: 8%;">Fecha</th>
-                <th style="width: 9%;">Folio</th>
+                <th style="width: 9%;">Correlativo No.</th>
                 <th style="width: 5%;">Villa</th>
                 <th style="width: 20%;">Propietario</th>
                 <th style="width: {{ $esCargo ? 49 : 39 }}%;">Descripción</th>
@@ -25,7 +25,7 @@
             @forelse ($filas as $f)
                 <tr>
                     <td>{{ Formato::fecha($f['fecha']) }}</td>
-                    <td>{{ $f['folio'] ?? '—' }}</td>
+                    <td>{{ $f['correlativo'] ?? '—' }}</td>
                     <td>{{ $f['villa'] }}</td>
                     <td>{{ $f['propietario'] }}</td>
                     <td>{{ $f['descripcion'] }}</td>

@@ -108,7 +108,7 @@ const acciones = [
   },
   {
     titulo: 'Reimpresión',
-    descripcion: 'Volver a imprimir un recibo ya emitido',
+    descripcion: 'Ver o volver a imprimir una nota de cargo o un recibo',
     accion: () => router.push({ name: 'reimpresion' }),
     // outline, distinto al resto (que son "fill"): se dibuja con stroke, ver template
     icon: 'M6.72 13.829a42.415 42.415 0 0110.56 0M6.34 18h11.318M6.34 18l.228 2.523a1.125 1.125 0 001.121 1.227h8.618a1.125 1.125 0 001.12-1.227L17.66 18M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0c.653.06 1.303.132 1.95.216 1.017.132 1.75 1.05 1.75 2.075V15.75a2.25 2.25 0 01-2.25 2.25h-1.083m-9.417-8.716V4.5A2.25 2.25 0 019 2.25h6a2.25 2.25 0 012.25 2.25v4.034M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z',

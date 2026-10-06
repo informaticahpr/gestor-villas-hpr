@@ -7,7 +7,7 @@ use App\Models\FormaPago;
 use App\Models\Movimiento;
 use App\Models\User;
 use App\Models\Villa;
-use App\Services\FolioService;
+use App\Services\CorrelativoService;
 use App\Services\SaldoService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -121,7 +121,7 @@ class SimulacionSeeder extends Seeder
 
     private SaldoService $saldos;
 
-    private FolioService $folios;
+    private CorrelativoService $correlativos;
 
     /** @var array<int, array<string, mixed>> */
     private array $filas = [];
@@ -142,10 +142,10 @@ class SimulacionSeeder extends Seeder
     /** @var list<int> */
     private array $formasPago = [];
 
-    public function run(SaldoService $saldos, FolioService $folios): void
+    public function run(SaldoService $saldos, CorrelativoService $correlativos): void
     {
         $this->saldos = $saldos;
-        $this->folios = $folios;
+        $this->correlativos = $correlativos;
         mt_srand(20260921);
 
         $hoy = Carbon::today();
@@ -482,7 +482,7 @@ class SimulacionSeeder extends Seeder
         };
     }
 
-    /** Ordena cronologicamente, asigna folios en ese orden y guarda. */
+    /** Ordena cronologicamente, asigna correlativos en ese orden y guarda. */
     private function guardar(): void
     {
         usort($this->filas, fn ($a, $b) => [$a['FECHA_APLI'], $a['creado']] <=> [$b['FECHA_APLI'], $b['creado']]);
@@ -491,7 +491,7 @@ class SimulacionSeeder extends Seeder
         foreach ($this->filas as $f) {
             $creado = $f['creado'];
             unset($f['creado']);
-            $f['FOLIO'] = $this->folios->siguiente($f['NUM_CPTO'] !== $this->conceptoAbono);
+            $f['CORRELATIVO'] = $this->correlativos->siguiente($f['NUM_CPTO'] !== $this->conceptoAbono);
             $f['FECHA_APLI'] = $f['FECHA_APLI']->format('Y-m-d H:i:s');
             $f['FECHA_VENC'] = $f['FECHA_VENC']?->format('Y-m-d H:i:s');
             $f['created_at'] = $creado->format('Y-m-d H:i:s');

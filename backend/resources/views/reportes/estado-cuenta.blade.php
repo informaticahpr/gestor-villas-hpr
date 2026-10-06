@@ -9,6 +9,8 @@
         .sin-corte { page-break-inside: avoid; }
         /* linea arriba de Fecha / Descripcion / ... para separarlos del nombre de la villa */
         table.datos tr.columnas th { border-top: 1px solid #000000; }
+        /* sin la linea de la cabecera: arriba del nombre de la villa no va linea */
+        table.cabecera { border-bottom: none; }
         /* anchos en % (con table-layout fixed, dompdf reparte parejo si no suman 100%): fecha justa, montos
            hasta -$99,999.99 sin partirse y la descripcion con el resto */
         table.estado .c-fecha { width: 12%; }
@@ -44,7 +46,7 @@
         @endphp
 
         {{-- cabeza: titulo, encabezado de columnas, saldo inicial y primeras filas --}}
-        <div class="sin-corte" style="margin-top: {{ $loop->first ? 0 : 18 }}px;">
+        <div class="sin-corte" style="margin-top: {{ $loop->first ? 12 : 18 }}px;">
             <table class="titulo-villa">
                 <tr>
                     <td style="font-size: 12px;">Villa #{{ $r['villa'] }} — {{ $r['propietario'] }}</td>

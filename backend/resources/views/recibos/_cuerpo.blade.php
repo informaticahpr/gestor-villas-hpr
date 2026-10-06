@@ -1,4 +1,4 @@
-{{-- Cuerpo del recibo. Se imprime dos veces (ver movimiento.blade.php): $copia = false para el
+{{-- Cuerpo del recibo / nota de cargo. Se imprime dos veces (ver movimiento.blade.php): $copia = false para el
      original del propietario, true para la copia que se queda el hotel (solo se distingue por la
      marca de agua COPIA). --}}
 @if ($copia && ! $movimiento->anulado())
@@ -46,7 +46,7 @@
             </td>
             <td class="folio">
                 <div class="tipo">Folio</div>
-                <div class="numero">{{ $movimiento->FOLIO ?? '—' }}</div>
+                <div class="numero">{{ $movimiento->correlativo_texto ?? '—' }}</div>
             </td>
         </tr>
     </table>

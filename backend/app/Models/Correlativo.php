@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class FolioCounter extends Model
+/** Contador del siguiente correlativo por tipo: CA (cargos) y CR (creditos/abonos). */
+class Correlativo extends Model
 {
-    protected $table = 'folio_counters';
+    protected $table = 'correlativos';
 
     protected $primaryKey = 'tipo';
 

@@ -499,7 +499,7 @@ class ImportadorEstadosCuenta
 
     /**
      * Script para PostgreSQL (DBeaver). BORRA todas las villas, propietarios, encargados, historial y
-     * movimientos (y reinicia los folios) y vuelve a cargar todo desde el Excel. Todo va en una sola
+     * movimientos (y reinicia los correlativos) y vuelve a cargar todo desde el Excel. Todo va en una sola
      * transaccion: si algo falla, no se borra ni se carga nada.
      */
     public function sql(array $plan): string
@@ -520,9 +520,11 @@ class ImportadorEstadosCuenta
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'villas' AND column_name = 'OBSERVACION') THEN RAISE EXCEPTION 'Railway todavía no tiene la última versión del sistema (falta la columna OBSERVACION de villas). Espera a que termine el despliegue y vuelve a correr el script.'; END IF; END \$\$;";
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM conceptos WHERE \"ES_MANTENIMIENTO\" = true) THEN RAISE EXCEPTION 'No existe el concepto de cuota de mantenimiento.'; END IF; END \$\$;";
         $s[] = '';
-        $s[] = '-- limpieza: se borra todo lo de villas y se reinician los folios';
+        $s[] = '-- limpieza: se borra todo lo de villas y se reinician los correlativos';
         $s[] = 'TRUNCATE TABLE movimientos, villa_historial, encargados, villas, propietarios RESTART IDENTITY;';
-        $s[] = "UPDATE folio_counters SET siguiente = 1 WHERE tipo IN ('CA', 'CR');";
+        // la tabla se llamaba folio_counters antes de la migracion que la renombro a correlativos:
+        // el script sirve con cualquiera de las dos (antes o despues del despliegue)
+        $s[] = "DO \$\$ BEGIN IF to_regclass('correlativos') IS NOT NULL THEN UPDATE correlativos SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); ELSE UPDATE folio_counters SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); END IF; END \$\$;";
         $s[] = '';
         $s[] = '-- conceptos que usa la importacion (inactivos si son propios de la importacion)';
         foreach (self::CONCEPTOS_IMPORTACION + ['Cargo extraordinario' => true, 'Mora' => true, 'Abono / Pago' => false] as $descr => $esCargo) {

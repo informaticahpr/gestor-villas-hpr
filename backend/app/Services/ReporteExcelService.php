@@ -87,7 +87,7 @@ class ReporteExcelService
     public function porConcepto(string $subtitulo, Collection $filas, bool $esCargo, string $usuario): Spreadsheet
     {
         // los creditos llevan ademas la forma de pago
-        $titulos = ['Fecha', 'Folio', 'Villa', 'Propietario', 'Descripción', ...($esCargo ? [] : ['Forma de pago']), 'Importe'];
+        $titulos = ['Fecha', 'Correlativo No.', 'Villa', 'Propietario', 'Descripción', ...($esCargo ? [] : ['Forma de pago']), 'Importe'];
         $ultima = $esCargo ? 'F' : 'G';
         [$libro, $hoja] = $this->plantilla('Reporte por concepto', $subtitulo, $ultima, PageSetup::ORIENTATION_LANDSCAPE, $usuario);
         $this->anchos($hoja, ['A' => 13, 'B' => 13, 'C' => 9, 'D' => 34, 'E' => 50] + ($esCargo ? ['F' => 16] : ['F' => 18, 'G' => 16]));
@@ -99,7 +99,7 @@ class ReporteExcelService
         foreach ($filas->values() as $i => $f) {
             $fila++;
             $hoja->setCellValue("A{$fila}", Carbon::parse($f['fecha'])->format('d/m/Y'));
-            $hoja->setCellValue("B{$fila}", $f['folio'] ?? '—');
+            $hoja->setCellValue("B{$fila}", $f['correlativo'] ?? '—');
             $hoja->setCellValue("C{$fila}", $f['villa']);
             $hoja->setCellValue("D{$fila}", $f['propietario']);
             $hoja->setCellValue("E{$fila}", $f['descripcion']);

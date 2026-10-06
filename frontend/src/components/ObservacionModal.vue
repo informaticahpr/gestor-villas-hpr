@@ -34,7 +34,7 @@ useEscapeKey(
         <div class="rounded-t-2xl border-b border-gold-300/30 bg-gradient-to-r from-brand-50/70 to-cream-50 px-6 py-4">
           <h2 class="font-display text-lg font-semibold text-espresso-800">{{ tipo }} — {{ movimiento.descripcion }}</h2>
           <p class="mt-1 text-xs text-espresso-800/55">
-            <span v-if="movimiento.folio">Folio {{ movimiento.folio }} · </span>{{ formatearFecha(movimiento.fecha) }} ·
+            <span v-if="movimiento.correlativo">Correlativo No. {{ movimiento.correlativo }} · </span>{{ formatearFecha(movimiento.fecha) }} ·
             {{ formatearMonto(importe) }}
           </p>
         </div>
@@ -58,7 +58,7 @@ useEscapeKey(
             class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
             @click="abrirRecibo(movimiento.id)"
           >
-            Ver recibo
+            Ver documento
           </button>
         </div>
       </div>

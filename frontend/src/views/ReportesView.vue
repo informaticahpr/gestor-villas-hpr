@@ -166,7 +166,7 @@ const desdeConcepto = ref(primerDiaMesActual())
 const hastaConcepto = ref(hoy())
 const cargandoConcepto = ref(false)
 const movimientosConcepto = ref<
-  Array<{ id: number; fecha: string; folio: string | null; villa: string; propietario: string | null; descripcion: string | null; forma_pago: string | null; importe: number }>
+  Array<{ id: number; fecha: string; correlativo: string | null; villa: string; propietario: string | null; descripcion: string | null; forma_pago: string | null; importe: number }>
 >([])
 const totalConcepto = ref(0)
 /** Concepto del ultimo reporte generado (la tabla muestra la forma de pago solo si es credito). */
@@ -331,7 +331,7 @@ watch(() => dataStore.version, () => {
             <thead>
               <tr class="text-left text-espresso-800/50">
                 <th class="py-1.5 pr-2">Fecha</th>
-                <th class="py-1.5 pr-2">Folio</th>
+                <th class="whitespace-nowrap py-1.5 pr-2">Correlativo No.</th>
                 <th class="py-1.5 pr-2">Villa</th>
                 <th class="py-1.5 pr-2">Propietario</th>
                 <th class="py-1.5 pr-2">Descripción</th>
@@ -343,14 +343,14 @@ watch(() => dataStore.version, () => {
             <tbody class="divide-y divide-gold-300/15">
               <tr v-for="m in movimientosConcepto" :key="m.id" class="hover:bg-brand-50/40">
                 <td class="whitespace-nowrap py-1.5 pr-2">{{ formatearFecha(m.fecha) }}</td>
-                <td class="whitespace-nowrap py-1.5 pr-2 font-mono text-xs">{{ m.folio ?? '—' }}</td>
+                <td class="whitespace-nowrap py-1.5 pr-2 font-mono text-xs">{{ m.correlativo ?? '—' }}</td>
                 <td class="py-1.5 pr-2 font-medium">{{ m.villa }}</td>
                 <td class="py-1.5 pr-2">{{ m.propietario }}</td>
                 <td class="py-1.5 pr-2 text-espresso-800/80">{{ m.descripcion }}</td>
                 <td v-if="!conceptoGenerado.ES_CARGO" class="py-1.5 pr-2">{{ m.forma_pago ?? '—' }}</td>
                 <td class="whitespace-nowrap py-1.5 pr-2 text-right font-medium">{{ formatearMonto(m.importe) }}</td>
                 <td class="py-1.5 text-right">
-                  <button type="button" class="text-xs font-medium text-brand-700 hover:underline" @click="abrirRecibo(m.id)">Recibo</button>
+                  <button type="button" class="text-xs font-medium text-brand-700 hover:underline" @click="abrirRecibo(m.id)">Ver documento</button>
                 </td>
               </tr>
               <tr v-if="movimientosConcepto.length === 0">
@@ -411,7 +411,7 @@ watch(() => dataStore.version, () => {
               v-for="(m, i) in r.estado_cuenta.movimientos"
               :key="i"
               tabindex="0"
-              title="Ver detalle y recibo"
+              title="Ver detalle y documento"
               class="cursor-pointer hover:bg-brand-50/50 focus:bg-brand-50/50 focus:outline-none"
               @click="movimientoDetalle = m"
               @keydown.enter="movimientoDetalle = m"

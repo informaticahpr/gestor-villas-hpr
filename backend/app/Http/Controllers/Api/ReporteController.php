@@ -200,7 +200,7 @@ class ReporteController extends Controller
             ->map(fn (Movimiento $m) => [
                 'id' => $m->ID_MOV,
                 'fecha' => $m->FECHA_APLI->toDateString(),
-                'folio' => $m->FOLIO,
+                'correlativo' => $m->CORRELATIVO,
                 'villa' => $m->CLV_CLIE,
                 'propietario' => $m->villa?->nombre_completo,
                 'descripcion' => $m->OBS,

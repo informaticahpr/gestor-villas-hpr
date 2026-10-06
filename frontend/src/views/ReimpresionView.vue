@@ -28,7 +28,7 @@ const meta = ref<MetaPaginacion>({ pagina: 1, por_pagina: 10, total: 0, ultima_p
 // formulario de filtros
 const filtroVilla = ref('') // '' = todas
 const filtroTipo = ref<'' | 'cargo' | 'credito'>('')
-const filtroFolio = ref('')
+const filtroCorrelativo = ref('')
 const filtroDesde = ref('')
 const filtroHasta = ref('')
 
@@ -52,7 +52,7 @@ async function cargar() {
       await cargar()
     }
   } catch (e: any) {
-    toast.error(mensajeDeError(e, 'No se pudieron cargar los recibos.'))
+    toast.error(mensajeDeError(e, 'No se pudieron cargar los movimientos.'))
   } finally {
     cargando.value = false
   }
@@ -62,7 +62,7 @@ function buscar() {
   filtrosAplicados.value = {
     villa: filtroVilla.value || undefined,
     tipo: filtroTipo.value || undefined,
-    q: filtroFolio.value.trim() || undefined,
+    q: filtroCorrelativo.value.trim() || undefined,
     desde: filtroDesde.value || undefined,
     hasta: filtroHasta.value || undefined,
   }
@@ -73,7 +73,7 @@ function buscar() {
 function limpiar() {
   filtroVilla.value = ''
   filtroTipo.value = ''
-  filtroFolio.value = ''
+  filtroCorrelativo.value = ''
   filtroDesde.value = ''
   filtroHasta.value = ''
   buscar()
@@ -123,7 +123,7 @@ async function confirmarAnulacion() {
   anulando.value = true
   try {
     await api.patch(`/api/movimientos/${porAnular.value.id}/anular`, { motivo: motivo.value.trim() })
-    toast.success(`Folio ${porAnular.value.folio ?? porAnular.value.id} anulado. Ya no cuenta en el saldo de la villa ${porAnular.value.villa}.`)
+    toast.success(`Correlativo No. ${porAnular.value.correlativo ?? porAnular.value.id} anulado. Ya no cuenta en el saldo de la villa ${porAnular.value.villa}.`)
     porAnular.value = null
     dataStore.tocar() // refresca esta lista, el dashboard y los saldos abiertos
   } catch (e: any) {
@@ -141,7 +141,7 @@ const claseCampo =
   <div>
     <p class="mb-1 font-display text-2xl font-semibold text-espresso-800">Reimpresión</p>
     <p class="mb-5 text-sm text-espresso-800/60">
-      Recibos de los cargos y abonos aplicados. Busca el movimiento y ábrelo para volver a imprimir su recibo.
+      Notas de cargo y recibos de los movimientos aplicados (original y copia). Busca el movimiento y ábrelo para verlo o volver a imprimirlo.
       <template v-if="auth.esDirectorOAdmin()">Si se capturó por error, anúlalo y vuelve a capturar el correcto.</template>
     </p>
 
@@ -170,8 +170,8 @@ const claseCampo =
         <FechaInput v-model="filtroHasta" :min="filtroDesde" :class="[claseCampo, 'w-40']" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-espresso-700">Folio</label>
-        <input v-model="filtroFolio" type="text" maxlength="40" placeholder="Ej. CR0000141" :class="[claseCampo, 'w-40']" />
+        <label class="mb-1 block text-sm font-medium text-espresso-700">Correlativo No.</label>
+        <input v-model="filtroCorrelativo" type="text" maxlength="40" placeholder="Ej. CR0000141" :class="[claseCampo, 'w-40']" />
       </div>
       <button
         type="submit"
@@ -194,7 +194,7 @@ const claseCampo =
       <table class="min-w-full divide-y divide-gold-300/20 text-sm">
         <thead class="bg-brand-50/60">
           <tr>
-            <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Folio</th>
+            <th class="whitespace-nowrap px-4 py-2.5 text-left font-medium text-espresso-800/70">Correlativo No.</th>
             <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Fecha</th>
             <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Villa</th>
             <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Concepto</th>
@@ -206,7 +206,7 @@ const claseCampo =
         </thead>
         <tbody class="divide-y divide-gold-300/15">
           <tr v-for="m in movimientos" :key="m.id" class="hover:bg-brand-50/40" :class="m.anulado ? 'bg-espresso-800/[0.03] text-espresso-800/50' : ''">
-            <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-espresso-900">{{ m.folio ?? '—' }}</td>
+            <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-espresso-900">{{ m.correlativo ?? '—' }}</td>
             <td class="whitespace-nowrap px-4 py-2.5 text-espresso-800/80">{{ formatearFecha(m.fecha) }}</td>
             <td class="px-4 py-2.5">
               <span class="font-medium text-espresso-900">{{ m.villa }}</span>
@@ -248,7 +248,7 @@ const claseCampo =
                 class="whitespace-nowrap rounded-lg border border-espresso-800/20 px-3 py-1.5 text-sm font-medium text-espresso-700 hover:bg-brand-50"
                 @click="abrirRecibo(m.id)"
               >
-                Ver recibo
+                Ver documento
               </button>
             </td>
           </tr>
@@ -270,7 +270,7 @@ const claseCampo =
         <form class="w-full max-w-md rounded-2xl bg-cream-50 shadow-2xl shadow-espresso-900/20" @submit.prevent="confirmarAnulacion">
           <div class="rounded-t-2xl border-b border-gold-300/30 bg-gradient-to-r from-wine-500/10 to-cream-50 px-6 py-4">
             <h2 class="font-display text-lg font-semibold text-espresso-800">
-              Anular {{ porAnular.tipo === 'cargo' ? 'cargo' : 'abono' }} {{ porAnular.folio ?? '' }}
+              Anular {{ porAnular.tipo === 'cargo' ? 'cargo' : 'abono' }} {{ porAnular.correlativo ?? '' }}
             </h2>
             <p class="mt-1 text-xs text-espresso-800/55">
               Villa {{ porAnular.villa }} · {{ porAnular.concepto }} · {{ formatearFecha(porAnular.fecha) }} ·

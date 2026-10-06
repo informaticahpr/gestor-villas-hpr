@@ -7,7 +7,7 @@ use App\Models\Bitacora;
 use App\Models\Concepto;
 use App\Models\Movimiento;
 use App\Models\Villa;
-use App\Services\FolioService;
+use App\Services\CorrelativoService;
 use App\Services\SaldoService;
 use App\Support\Formato;
 use App\Support\Paginacion;
@@ -20,13 +20,13 @@ class MovimientoController extends Controller
 {
     public function __construct(
         private readonly SaldoService $saldoService,
-        private readonly FolioService $folioService,
+        private readonly CorrelativoService $correlativos,
     ) {}
 
     /**
      * Listado de movimientos (cargos y abonos) para la pantalla de Reimpresion: de aqui se abre el
      * recibo de cada uno. Paginado, del mas reciente al mas antiguo, con filtros opcionales por villa,
-     * tipo, folio y rango de fechas del movimiento.
+     * tipo, correlativo y rango de fechas del movimiento.
      */
     public function index(Request $request)
     {
@@ -44,7 +44,7 @@ class MovimientoController extends Controller
             ...Paginacion::mensajes(),
         ]);
 
-        // Reimpresion muestra tambien los anulados (marcados como tales) para que quede el rastro del folio.
+        // Reimpresion muestra tambien los anulados (marcados como tales) para que quede el rastro del correlativo.
         $query = Movimiento::conAnulados()
             ->with(['villa', 'concepto', 'formaPago', 'usuario', 'anuladoPor'])
             ->orderByDesc('FECHA_APLI')
@@ -57,7 +57,7 @@ class MovimientoController extends Controller
             $query->whereHas('concepto', fn ($q) => $q->where('ES_CARGO', $data['tipo'] === 'cargo'));
         }
         if (! empty($data['q'])) {
-            $query->where('FOLIO', 'like', '%'.trim($data['q']).'%');
+            $query->where('CORRELATIVO', 'like', '%'.trim($data['q']).'%');
         }
         if (! empty($data['desde'])) {
             $query->whereDate('FECHA_APLI', '>=', $data['desde']);
@@ -71,7 +71,7 @@ class MovimientoController extends Controller
         return response()->json([
             'data' => $pagina->getCollection()->map(fn (Movimiento $m) => [
                 'id' => $m->ID_MOV,
-                'folio' => $m->FOLIO,
+                'correlativo' => $m->CORRELATIVO,
                 'fecha' => $m->FECHA_APLI->toDateString(),
                 'villa' => $m->CLV_CLIE,
                 'propietario' => $m->villa?->nombre_completo,
@@ -155,7 +155,7 @@ class MovimientoController extends Controller
             'ANIO' => $fecha->year,
             'MES' => $fecha->month,
             'USUARIO_ID' => $request->user()->id,
-            'FOLIO' => $this->folioService->siguiente($concepto->ES_CARGO),
+            'CORRELATIVO' => $this->correlativos->siguiente($concepto->ES_CARGO),
         ]);
 
         $this->saldoService->recalcularSaldo($villa);
@@ -219,7 +219,7 @@ class MovimientoController extends Controller
                 'ANIO' => $fecha->year,
                 'MES' => $fecha->month,
                 'USUARIO_ID' => $request->user()->id,
-                'FOLIO' => $this->folioService->siguiente(true),
+                'CORRELATIVO' => $this->correlativos->siguiente(true),
             ]);
 
             $this->saldoService->recalcularSaldo($villa);
@@ -234,8 +234,8 @@ class MovimientoController extends Controller
 
     /**
      * Anula un cargo o abono capturado por error (solo Director/Admin). No se borra: conserva su
-     * folio y queda quien, cuando y por que; pero deja de contar en saldos, estados de cuenta,
-     * reportes y dashboard. El movimiento correcto se vuelve a capturar normal, con folio nuevo.
+     * correlativo y queda quien, cuando y por que; pero deja de contar en saldos, estados de cuenta,
+     * reportes y dashboard. El movimiento correcto se vuelve a capturar normal, con correlativo nuevo.
      */
     public function anular(Request $request, Movimiento $movimiento)
     {
@@ -263,7 +263,7 @@ class MovimientoController extends Controller
         Bitacora::registrar(
             'movimiento',
             'anular',
-            'Anuló '.$tipo.' folio '.($movimiento->FOLIO ?? $movimiento->ID_MOV).' ('.$movimiento->concepto->DESCR.') de la villa '
+            'Anuló '.$tipo.' '.($movimiento->correlativo_texto ?? $movimiento->ID_MOV).' ('.$movimiento->concepto->DESCR.') de la villa '
                 .$movimiento->CLV_CLIE.' por '.Formato::monto((float) $movimiento->IMPORTE).'. Motivo: '.$movimiento->MOTIVO_ANULACION,
         );
 

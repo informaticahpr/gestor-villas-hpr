@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             ConceptoSeeder::class,
             FormaPagoSeeder::class,
-            FolioCounterSeeder::class,
+            CorrelativoSeeder::class,
             VillaSeeder::class,
             MovimientoSeeder::class,
         ]);

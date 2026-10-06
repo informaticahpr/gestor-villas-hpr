@@ -83,7 +83,7 @@ export interface VillaDetalle {
 
 export interface MovimientoFila {
   id: number
-  folio: string | null
+  correlativo: string | null
   tipo: 'cargo' | 'credito'
   fecha: string
   descripcion: string
@@ -133,7 +133,7 @@ export interface MetaBitacora extends MetaPaginacion {
 /** Un movimiento (cargo o abono) tal como lo lista la pantalla de Reimpresión. */
 export interface MovimientoListado {
   id: number
-  folio: string | null
+  correlativo: string | null
   /** AAAA-MM-DD */
   fecha: string
   villa: string

@@ -184,7 +184,11 @@ async function guardar() {
         OBS: form.OBS || null,
       })
       toast.success('Movimiento aplicado correctamente.')
-      abrirRecibo(data.movimiento.ID_MOV)
+      // el abono se imprime en cuanto se registra (original y copia); la nota de cargo solo se registra
+      // y se consulta despues desde los movimientos (Ver documento)
+      if (tipo.value === 'credito') {
+        abrirRecibo(data.movimiento.ID_MOV)
+      }
     }
     dataStore.tocar()
     emit('saved')

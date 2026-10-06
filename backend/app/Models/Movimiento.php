@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 // ANULADO_EN, ANULADO_POR y MOTIVO_ANULACION no son asignables en masa: solo los fija anular().
 #[Fillable([
     'CLV_CLIE', 'NUM_CPTO', 'FORMA_PAGO_ID', 'IMPORTE', 'FECHA_APLI', 'FECHA_VENC',
-    'ANIO', 'MES', 'REFER', 'OBS', 'USUARIO_ID', 'FOLIO',
+    'ANIO', 'MES', 'REFER', 'OBS', 'USUARIO_ID', 'CORRELATIVO',
 ])]
 class Movimiento extends Model
 {
@@ -47,6 +47,12 @@ class Movimiento extends Model
     public function resolveRouteBinding($value, $field = null)
     {
         return static::conAnulados()->where($field ?? $this->getRouteKeyName(), $value)->first();
+    }
+
+    /** Correlativo como se imprime en los documentos: "No.CR0000001" (null si el movimiento no tiene). */
+    public function getCorrelativoTextoAttribute(): ?string
+    {
+        return $this->CORRELATIVO ? 'No.'.$this->CORRELATIVO : null;
     }
 
     public function anulado(): bool

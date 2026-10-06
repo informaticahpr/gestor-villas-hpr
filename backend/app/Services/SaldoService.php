@@ -97,7 +97,7 @@ class SaldoService
 
             $filas->push([
                 'id' => $mov->ID_MOV,
-                'folio' => $mov->FOLIO,
+                'correlativo' => $mov->CORRELATIVO,
                 'tipo' => $esCargo ? 'cargo' : 'credito',
                 'fecha' => $mov->FECHA_APLI->toDateString(),
                 'descripcion' => $mov->concepto->DESCR,

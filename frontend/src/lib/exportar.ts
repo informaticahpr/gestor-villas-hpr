@@ -2,7 +2,7 @@ import api from './api'
 
 export type FormatoExportacion = 'excel' | 'pdf'
 
-/** Abre en una pestaña nueva el recibo (PDF) de un movimiento; sirve tanto para el primero como para reimprimirlo. */
+/** Abre en una pestaña nueva el documento (PDF, original y copia) de un movimiento: recibo si es abono, nota de cargo si es cargo. */
 export function abrirRecibo(idMovimiento: number) {
   window.open(`${api.defaults.baseURL}/api/movimientos/${idMovimiento}/recibo`, '_blank')
 }
