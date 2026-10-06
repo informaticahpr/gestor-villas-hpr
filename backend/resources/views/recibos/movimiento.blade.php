@@ -16,17 +16,15 @@
         .anulado { border: 2px solid #a81f2e; color: #a81f2e; padding: 10px 14px; margin-bottom: 14px; }
         .anulado .sello { font-size: 22px; font-weight: bold; letter-spacing: 4px; }
         .anulado .detalle { font-size: 11px; margin-top: 4px; }
-        /* logo mas grande que en los reportes */
-        table.cabecera td.logo { width: 110px; }
-        table.cabecera img { width: 96px; }
         .titulo { margin-top: 0; font-size: 18px; }
         .subtitulo { margin-top: 4px; font-size: 11px; }
         table.cabecera { margin-bottom: 10px; }
         .salto-pagina { page-break-after: always; }
         /* absolute (no fixed): solo en la pagina de la copia */
-        .marca-copia { position: absolute; top: 128px; left: 0; width: 100%; text-align: center; font-size: 115px;
-            font-weight: bold; color: #000000; opacity: 0.07; transform: rotate(-30deg); letter-spacing: 10px; }
-        .marca-agua { position: fixed; top: 17%; left: 0; width: 100%; text-align: center; font-size: 100px;
+        /* centrada en el bloque de datos */
+        .marca-copia { position: absolute; top: 120px; left: 0; width: 100%; text-align: center; font-size: 125px;
+            font-weight: bold; color: #000000; opacity: 0.07; transform: rotate(-30deg); letter-spacing: 14px; }
+        .marca-agua { position: fixed; top: 24%; left: 0; width: 100%; text-align: center; font-size: 125px;
             font-weight: bold; color: #a81f2e; opacity: 0.12; transform: rotate(-30deg); }
 @endsection
 
