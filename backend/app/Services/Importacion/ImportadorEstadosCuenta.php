@@ -144,16 +144,31 @@ class ImportadorEstadosCuenta
         if ($bloque['codigo_inferido']) {
             $avisos[] = "El título del bloque (\"{$bloque['titulo']}\", fila {$bloque['fila']}) no trae número de villa: se asumió {$codigo} por ir después de la anterior.";
         }
+        $bloque['filas'] = $this->corregirAniosMalEscritos($bloque['filas'], $avisos);
 
-        // 1) saldo a la fecha de corte: el del Excel en la ultima fila antes del primer movimiento posterior
+        // 1) Punto de corte: el Excel tiene fechas fuera de orden (y alguna mal escrita), asi que no basta
+        //    con "la primera fila posterior al corte". Se elige el punto (en el orden del Excel) que mejor
+        //    separa "antes" de "despues": el que deja menos filas fuera de lugar. Ej. A-12 tiene un
+        //    "24/12/2026" entre filas de dic-2022 y ene-2023: queda antes del corte e incluido en el saldo,
+        //    como en el Excel, en vez de partir ahi el corte y cargarse como pago a futuro.
+        $filas = $bloque['filas'];
+        $split = $this->mejorPuntoDeCorte($filas, $corte);
+        foreach ($filas as $k => $f) {
+            if ($f['fecha'] === null) {
+                continue;
+            }
+            if ($k < $split && $f['fecha'] > $corte) {
+                $avisos[] = "Fila {$f['fila']}: fecha {$f['fecha']} entre movimientos anteriores al corte (¿fecha mal escrita?); queda incluida en el saldo al corte, como en el Excel.";
+            } elseif ($k >= $split && $f['fecha'] <= $corte && ($f['debe'] || $f['haber'])) {
+                $avisos[] = "Fila {$f['fila']}: fecha {$f['fecha']} entre movimientos posteriores al corte; se carga con su fecha.";
+            }
+        }
+
+        // saldo al corte: el del Excel en la ultima fila antes del punto de corte
         $saldo = 0.0;
         $i = 0;
-        $filas = $bloque['filas'];
-        for (; $i < count($filas); $i++) {
+        for (; $i < $split; $i++) {
             $f = $filas[$i];
-            if ($f['fecha'] !== null && $f['fecha'] > $corte) {
-                break;
-            }
             if ($f['fecha'] === null) {
                 continue;
             }
@@ -250,6 +265,92 @@ class ImportadorEstadosCuenta
             'movimientos' => $movs,
             'avisos' => $avisos,
         ];
+    }
+
+    private const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+    /**
+     * Corrige años mal escritos a mano. El saldo del Excel (columna F) es el correcto y sigue el orden de
+     * las filas; una fila cuya fecha no encaja entre la anterior y la siguiente, pero SI encaja con el
+     * mismo dia y mes en el año de una de ellas, tiene el año mal escrito (ej. A-9 fila 2285: "28/01/2026"
+     * entre el 02/01/2025 y el 01/02/2025 -> 28/01/2025). Si la descripcion trae ese mismo mes con el año
+     * equivocado (ej. "Cuota de mantenimiento de Marzo 2025" en una fila de marzo 2026), tambien se corrige.
+     * El saldo no cambia: solo la fecha en que queda el movimiento.
+     */
+    public function corregirAniosMalEscritos(array $filas, array &$avisos = []): array
+    {
+        $conMonto = array_keys(array_filter($filas, fn ($f) => $f['fecha'] !== null && ($f['debe'] || $f['haber'])));
+        $correcciones = [];
+        for ($j = 1; $j < count($conMonto) - 1; $j++) {
+            [$prev, $f, $next] = [$filas[$conMonto[$j - 1]], $filas[$conMonto[$j]], $filas[$conMonto[$j + 1]]];
+            $fueraDeOrden = $prev['fecha'] <= $next['fecha'] && ($f['fecha'] < $prev['fecha'] || $f['fecha'] > $next['fecha']);
+            if (! $fueraDeOrden) {
+                continue;
+            }
+            foreach ([substr($prev['fecha'], 0, 4), substr($next['fecha'], 0, 4)] as $anio) {
+                $candidata = $anio.substr($f['fecha'], 4);
+                if ($anio !== substr($f['fecha'], 0, 4) && $candidata >= $prev['fecha'] && $candidata <= $next['fecha'] && checkdate((int) substr($candidata, 5, 2), (int) substr($candidata, 8, 2), (int) $anio)) {
+                    $correcciones[$conMonto[$j]] = $candidata;
+                    break;
+                }
+            }
+        }
+
+        foreach ($correcciones as $k => $nueva) {
+            $antes = $filas[$k]['fecha'];
+            $filas[$k]['fecha'] = $nueva;
+            $aviso = "Fila {$filas[$k]['fila']}: fecha con el año mal escrito, se corrigió ".Carbon::parse($antes)->format('d/m/Y').' → '.Carbon::parse($nueva)->format('d/m/Y');
+
+            // descripcion con el mismo mes y el año equivocado ("... Marzo 2025" en una fila de marzo 2026)
+            $mes = self::MESES[(int) substr($nueva, 5, 2) - 1];
+            $anioNuevo = substr($nueva, 0, 4);
+            $descripcion = (string) $filas[$k]['descripcion'];
+            $corregida = preg_replace_callback('/\b('.$mes.')\s+(\d{4})\b/iu', fn ($m) => $m[2] === $anioNuevo ? $m[0] : $m[1].' '.$anioNuevo, $descripcion);
+            if ($corregida !== $descripcion) {
+                $filas[$k]['descripcion'] = $corregida;
+                $aviso .= " y en la descripción (\"{$descripcion}\" → \"{$corregida}\")";
+            }
+            $avisos[] = $aviso.'.';
+        }
+
+        return $filas;
+    }
+
+    /**
+     * Indice (en el orden del Excel) donde empiezan los movimientos posteriores al corte: el que minimiza
+     * las filas fuera de lugar (con fecha posterior al corte antes del punto + con fecha anterior despues).
+     * Ante empate, el mas tardio (asi una fecha mal escrita queda dentro del saldo del Excel).
+     */
+    private function mejorPuntoDeCorte(array $filas, string $corte): int
+    {
+        $n = count($filas);
+        $despuesAnteriores = 0; // filas con fecha <= corte desde el punto en adelante
+        foreach ($filas as $f) {
+            if ($f['fecha'] !== null && $f['fecha'] <= $corte) {
+                $despuesAnteriores++;
+            }
+        }
+
+        $mejor = 0;
+        $mejorCosto = PHP_INT_MAX;
+        $antesPosteriores = 0; // filas con fecha > corte antes del punto
+        for ($p = 0; $p <= $n; $p++) {
+            $costo = $antesPosteriores + $despuesAnteriores;
+            if ($costo <= $mejorCosto) {
+                $mejorCosto = $costo;
+                $mejor = $p;
+            }
+            if ($p < $n && $filas[$p]['fecha'] !== null) {
+                $filas[$p]['fecha'] > $corte ? $antesPosteriores++ : $despuesAnteriores--;
+            }
+        }
+
+        // no pasar del ultimo movimiento con fecha (las filas finales sin fecha no cambian el saldo)
+        while ($mejor > 0 && $filas[$mejor - 1]['fecha'] === null) {
+            $mejor--;
+        }
+
+        return $mejor;
     }
 
     private function conceptoCargo(?string $descripcion): string
