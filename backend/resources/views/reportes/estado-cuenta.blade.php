@@ -14,7 +14,8 @@
         /* anchos en % (con table-layout fixed, dompdf reparte parejo si no suman 100%): fecha justa, montos
            hasta -$99,999.99 sin partirse y la descripcion con el resto */
         table.estado .c-fecha { width: 12%; }
-        table.estado .c-desc { width: 49%; }
+        /* un poco de aire entre la fecha y la descripcion */
+        table.estado .c-desc { width: 49%; padding-left: 28px; }
         table.estado .c-monto { width: 12.5%; }
         table.estado .c-saldo { width: 14%; }
         /* nombre de la villa y saldo a la fecha, en una linea arriba de la tabla */
