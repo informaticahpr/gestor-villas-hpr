@@ -119,8 +119,8 @@ export interface FormaPago {
   activo: boolean
 }
 
-export type EntidadBitacora = 'usuario' | 'concepto' | 'forma_pago' | 'cuota_especial' | 'cuota_mantenimiento' | 'movimiento' | 'villa_alquilada'
-export type AccionBitacora = 'crear' | 'editar' | 'activar' | 'desactivar' | 'eliminar' | 'anular'
+export type EntidadBitacora = 'usuario' | 'concepto' | 'forma_pago' | 'cuota_especial' | 'cuota_mantenimiento' | 'movimiento' | 'villa_alquilada' | 'sesion'
+export type AccionBitacora = 'crear' | 'editar' | 'activar' | 'desactivar' | 'eliminar' | 'anular' | 'iniciar' | 'cerrar'
 
 export interface MetaPaginacion {
   pagina: number

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Bitacora;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -53,11 +54,18 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
+        Bitacora::registrar('sesion', 'iniciar', "{$user->name} ({$user->usuario}) inició sesión.");
+
         return response()->json(['user' => $this->serialize($user)]);
     }
 
     public function logout(Request $request)
     {
+        // antes de cerrar la sesion: la bitacora toma al usuario autenticado
+        if ($user = $request->user()) {
+            Bitacora::registrar('sesion', 'cerrar', "{$user->name} ({$user->usuario}) cerró sesión.");
+        }
+
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

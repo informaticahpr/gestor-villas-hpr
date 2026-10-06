@@ -28,6 +28,7 @@ class BitacoraController extends Controller
         'cuota_especial' => 'Cuotas especiales',
         'cuota_mantenimiento' => 'Cuota de mantenimiento',
         'villa_alquilada' => 'Villas alquiladas',
+        'sesion' => 'Sesiones',
         'movimiento' => 'Cargos y abonos',
     ];
 

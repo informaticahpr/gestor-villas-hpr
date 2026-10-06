@@ -600,6 +600,7 @@ const ENTIDADES: Array<{ value: EntidadBitacora; label: string }> = [
   { value: 'cuota_mantenimiento', label: 'Cuota de mantenimiento' },
   { value: 'movimiento', label: 'Cargos y abonos' },
   { value: 'villa_alquilada', label: 'Villas alquiladas' },
+  { value: 'sesion', label: 'Sesiones' },
 ]
 
 const ACCIONES: Array<{ value: AccionBitacora; label: string }> = [
@@ -609,6 +610,8 @@ const ACCIONES: Array<{ value: AccionBitacora; label: string }> = [
   { value: 'desactivar', label: 'Desactivar' },
   { value: 'eliminar', label: 'Eliminar' },
   { value: 'anular', label: 'Anular' },
+  { value: 'iniciar', label: 'Iniciar sesión' },
+  { value: 'cerrar', label: 'Cerrar sesión' },
 ]
 
 function etiquetaEntidad(entidad: string): string {
