@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ExencionCuota;
 use App\Models\Movimiento;
 use App\Models\Villa;
 use Carbon\Carbon;
@@ -88,10 +89,35 @@ class SaldoService
             ->orderBy('ID_MOV')
             ->get();
 
+        // meses en que no se le cobro la cuota por estar alquilada a España: lineas informativas, sin
+        // monto (no cambian el saldo), despues de los movimientos de ese mismo dia
+        $exenciones = ExencionCuota::where('CLV_CLIE', $villa->CLV_CLIE)
+            ->whereDate('FECHA', '>=', $desde->toDateString())
+            ->whereDate('FECHA', '<=', $hasta->toDateString())
+            ->orderBy('FECHA')
+            ->get();
+
         $saldoCorrido = $saldoInicial;
         $filas = collect();
+        $agregarExencionesHasta = function (?string $fecha) use (&$exenciones, &$filas, &$saldoCorrido) {
+            while ($exenciones->isNotEmpty() && ($fecha === null || $exenciones->first()->FECHA->toDateString() < $fecha)) {
+                $ex = $exenciones->shift();
+                $filas->push([
+                    'id' => null,
+                    'correlativo' => null,
+                    'tipo' => 'exencion',
+                    'fecha' => $ex->FECHA->toDateString(),
+                    'descripcion' => $ex->MOTIVO,
+                    'observacion' => 'Cuota de mantenimiento de '.$ex->FECHA->locale('es')->translatedFormat('F Y').' no cobrada.',
+                    'cargo' => 0,
+                    'credito' => 0,
+                    'saldo' => round($saldoCorrido, 2),
+                ]);
+            }
+        };
 
         foreach ($movimientos as $mov) {
+            $agregarExencionesHasta($mov->FECHA_APLI->toDateString());
             $esCargo = (bool) $mov->concepto->ES_CARGO;
             $saldoCorrido += $esCargo ? $mov->IMPORTE : -$mov->IMPORTE;
 
@@ -107,6 +133,7 @@ class SaldoService
                 'saldo' => round($saldoCorrido, 2),
             ]);
         }
+        $agregarExencionesHasta(null);
 
         return collect([
             'saldo_inicial' => round($saldoInicial, 2),

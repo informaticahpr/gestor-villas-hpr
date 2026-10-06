@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../lib/api'
 import { useAuthStore } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
@@ -29,7 +29,8 @@ const auth = useAuthStore()
 const toast = useToastStore()
 const dialog = useDialogStore()
 
-const tab = ref<'usuarios' | 'conceptos' | 'cuotas' | 'formas-pago' | 'bitacora'>('usuarios')
+// el Supervisor solo ve (y entra directo a) "Villas alquiladas"
+const tab = ref<'usuarios' | 'conceptos' | 'cuotas' | 'alquiladas' | 'formas-pago' | 'bitacora'>(auth.esSupervisor() ? 'alquiladas' : 'usuarios')
 
 // --- iconos (outline, mismo estilo que ToastContainer.vue) ---
 const iconEditar = 'M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z'
@@ -296,6 +297,80 @@ async function eliminarConcepto(c: Concepto) {
   }
 }
 
+// --- Villas alquiladas a España: no pagan la cuota de mantenimiento mientras esten marcadas ---
+const villasTodas = ref<VillaResumen[]>([])
+const cargandoAlquiladas = ref(false)
+const guardandoAlquilada = ref<string | null>(null)
+const filtroAlquiladas = ref('')
+const bloqueAlquiladas = ref<string | null>(null) // null = todos los bloques
+const totalAlquiladas = computed(() => villasTodas.value.filter((v) => v.alquilada).length)
+
+// bloque = la letra de la villa (A-1 -> A); salen de las villas registradas, asi un bloque nuevo aparece solo
+function bloqueDe(villa: string): string {
+  return villa.split('-')[0].toUpperCase()
+}
+const bloquesAlquiladas = computed(() => {
+  const porBloque = new Map<string, { total: number; alquiladas: number }>()
+  for (const v of villasTodas.value) {
+    const b = porBloque.get(bloqueDe(v.villa)) ?? { total: 0, alquiladas: 0 }
+    b.total++
+    if (v.alquilada) b.alquiladas++
+    porBloque.set(bloqueDe(v.villa), b)
+  }
+  return [...porBloque.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([bloque, n]) => ({ bloque, ...n }))
+})
+
+const villasAlquiladasFiltradas = computed(() => {
+  const q = filtroAlquiladas.value.trim().toLowerCase().replace(/-/g, '')
+  return villasTodas.value.filter(
+    (v) =>
+      (bloqueAlquiladas.value === null || bloqueDe(v.villa) === bloqueAlquiladas.value) &&
+      (!q || v.villa.toLowerCase().replace(/-/g, '').includes(q) || v.nombre_completo.toLowerCase().includes(q)),
+  )
+})
+
+async function cargarVillasAlquiladas() {
+  cargandoAlquiladas.value = true
+  try {
+    const { data } = await api.get('/api/villas')
+    villasTodas.value = data.data
+  } catch (e: any) {
+    toast.error(mensajeDeError(e, 'No se pudieron cargar las villas.'))
+  } finally {
+    cargandoAlquiladas.value = false
+  }
+}
+
+async function cambiarAlquilada(v: VillaResumen, alquilada: boolean) {
+  guardandoAlquilada.value = v.villa
+  try {
+    await api.patch(`/api/villas/${v.villa}/alquilada`, { ALQUILADA: alquilada })
+    v.alquilada = alquilada
+    toast.success(alquilada ? `Villa ${v.villa} marcada como alquilada a España.` : `Villa ${v.villa} vuelve a pagar la cuota de mantenimiento.`)
+  } catch (e: any) {
+    toast.error(mensajeDeError(e, 'No se pudo guardar el cambio.'))
+  } finally {
+    guardandoAlquilada.value = null
+  }
+}
+
+// cuando España se va: desmarca todas de una vez
+async function desmarcarTodasAlquiladas() {
+  const marcadas = villasTodas.value.filter((v) => v.alquilada)
+  if (marcadas.length === 0) return
+  const ok = await dialog.confirmar({
+    titulo: 'Desmarcar todas',
+    mensaje: `Las ${marcadas.length} villas alquiladas (${marcadas.map((v) => v.villa).join(', ')}) volverán a pagar la cuota de mantenimiento.`,
+    textoConfirmar: 'Desmarcar todas',
+  })
+  if (!ok) return
+  for (const v of marcadas) {
+    await cambiarAlquilada(v, false)
+  }
+}
+
 // --- Cuotas: submenu "Cuota de mantenimiento" / "Cuotas especiales" ---
 const subtabCuotas = ref<'mantenimiento' | 'especiales'>('mantenimiento')
 
@@ -524,6 +599,7 @@ const ENTIDADES: Array<{ value: EntidadBitacora; label: string }> = [
   { value: 'cuota_especial', label: 'Cuotas especiales' },
   { value: 'cuota_mantenimiento', label: 'Cuota de mantenimiento' },
   { value: 'movimiento', label: 'Cargos y abonos' },
+  { value: 'villa_alquilada', label: 'Villas alquiladas' },
 ]
 
 const ACCIONES: Array<{ value: AccionBitacora; label: string }> = [
@@ -629,6 +705,9 @@ function exportarBitacora(formato: FormatoExportacion) {
 }
 
 onMounted(() => {
+  cargarVillasAlquiladas()
+  // el resto de Configuracion es solo del Director y el Administrador
+  if (!auth.esDirectorOAdmin()) return
   cargarUsuarios()
   cargarConceptos()
   cargarCuotaMantenimiento()
@@ -643,6 +722,7 @@ onMounted(() => {
     <p class="mb-4 font-display text-2xl font-semibold text-espresso-800">Configuración</p>
 
     <div class="mb-6 flex flex-wrap gap-4 border-b border-gold-300/30 text-sm">
+      <template v-if="auth.esDirectorOAdmin()">
       <button
         class="border-b-2 px-1 pb-2 font-medium"
         :class="tab === 'usuarios' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
@@ -664,6 +744,15 @@ onMounted(() => {
       >
         Cuotas
       </button>
+      </template>
+      <button
+        class="border-b-2 px-1 pb-2 font-medium"
+        :class="tab === 'alquiladas' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
+        @click="tab = 'alquiladas'"
+      >
+        Villas alquiladas
+      </button>
+      <template v-if="auth.esDirectorOAdmin()">
       <button
         class="border-b-2 px-1 pb-2 font-medium"
         :class="tab === 'formas-pago' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
@@ -678,6 +767,7 @@ onMounted(() => {
       >
         Bitácora
       </button>
+      </template>
     </div>
 
     <!-- Usuarios -->
@@ -1119,6 +1209,87 @@ onMounted(() => {
           </tbody>
         </table>
       </div>
+      </div>
+    </section>
+
+    <!-- Villas alquiladas a España -->
+    <section v-if="tab === 'alquiladas'">
+      <p class="mb-1 font-display text-lg font-semibold text-espresso-800">Villas alquiladas</p>
+      <p class="mb-4 text-sm text-espresso-800/60">
+        Marca las villas alquiladas a la producción de España. Mientras estén marcadas, al aplicar la cuota de
+        mantenimiento a todas no se les cobra y en su estado de cuenta aparece "Exenta por alquiler de España".
+        Cuando España se vaya, desmárcalas para que vuelvan a pagar.
+      </p>
+
+      <div class="mb-3 flex flex-wrap items-center gap-3">
+        <!-- filtro por bloque (la letra de la villa), con cuantas alquiladas lleva cada uno -->
+        <select
+          v-model="bloqueAlquiladas"
+          aria-label="Bloque"
+          class="rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+        >
+          <option :value="null">Todos los bloques ({{ totalAlquiladas }} de {{ villasTodas.length }} alquiladas)</option>
+          <option v-for="b in bloquesAlquiladas" :key="b.bloque" :value="b.bloque">
+            Bloque {{ b.bloque }} ({{ b.alquiladas }} de {{ b.total }} alquiladas)
+          </option>
+        </select>
+        <input
+          v-model="filtroAlquiladas"
+          type="text"
+          placeholder="Buscar villa o propietario"
+          class="w-64 rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+        />
+        <span class="text-sm text-espresso-800/70">
+          <strong class="text-espresso-900">{{ totalAlquiladas }}</strong> de {{ villasTodas.length }}
+          {{ totalAlquiladas === 1 ? 'villa alquilada' : 'villas alquiladas' }}
+        </span>
+        <button
+          v-if="totalAlquiladas > 0"
+          type="button"
+          :disabled="guardandoAlquilada !== null"
+          class="ml-auto rounded-lg border border-espresso-800/20 px-3 py-1.5 text-sm font-medium text-espresso-700 hover:bg-brand-50 disabled:opacity-50"
+          @click="desmarcarTodasAlquiladas"
+        >
+          Desmarcar todas
+        </button>
+      </div>
+
+      <div class="overflow-hidden rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+        <table class="min-w-full divide-y divide-gold-300/20 text-sm">
+          <thead class="bg-brand-50/60">
+            <tr>
+              <th class="w-24 px-4 py-2.5 text-left font-medium text-espresso-800/70">Villa</th>
+              <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Propietario</th>
+              <th class="w-48 px-4 py-2.5 text-center font-medium text-espresso-800/70">Alquilada a España</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gold-300/15">
+            <tr
+              v-for="v in villasAlquiladasFiltradas"
+              :key="v.villa"
+              class="cursor-pointer hover:bg-brand-50/40"
+              :class="v.alquilada ? 'bg-brand-50/50' : ''"
+              @click="guardandoAlquilada === null && cambiarAlquilada(v, !v.alquilada)"
+            >
+              <td class="px-4 py-2 font-medium text-espresso-900">{{ v.villa }}</td>
+              <td class="px-4 py-2 text-espresso-800/80">{{ v.nombre_completo }}</td>
+              <td class="px-4 py-2 text-center">
+                <input
+                  type="checkbox"
+                  :checked="v.alquilada"
+                  :disabled="guardandoAlquilada !== null"
+                  :aria-label="`Villa ${v.villa} alquilada a España`"
+                  class="h-4 w-4 cursor-pointer accent-brand-600"
+                  @click.stop
+                  @change="cambiarAlquilada(v, ($event.target as HTMLInputElement).checked)"
+                />
+              </td>
+            </tr>
+            <tr v-if="!cargandoAlquiladas && villasAlquiladasFiltradas.length === 0">
+              <td colspan="3" class="px-4 py-8 text-center text-espresso-800/40">No hay villas que coincidan</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
 

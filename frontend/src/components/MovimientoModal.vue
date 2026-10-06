@@ -43,6 +43,11 @@ const form = reactive({
 
 // --- modo "todas" (cuota mensual) ---
 const villasConAplicobro = computed(() => villas.value.filter((v) => v.aplicobro))
+// alquiladas a España: no pagan la cuota de mantenimiento (los demas cargos a todas si)
+const villasAlquiladasEnTodas = computed(() =>
+  conceptoSeleccionado.value?.ES_MANTENIMIENTO ? villasConAplicobro.value.filter((v) => v.alquilada) : [],
+)
+const villasACobrarEnTodas = computed(() => villasConAplicobro.value.length - villasAlquiladasEnTodas.value.length)
 // la cuota especial de una villa solo reemplaza a la cuota de mantenimiento, no a otros conceptos
 const villasConCuotaEspecialEnTodas = computed(() =>
   conceptoSeleccionado.value?.ES_MANTENIMIENTO
@@ -172,7 +177,10 @@ async function guardar() {
       const detalleCuotaEspecial = data.villas_con_cuota_especial > 0
         ? ` (${data.villas_con_cuota_especial} con cuota especial, a su monto asignado)`
         : ''
-      toast.success(`Cargo aplicado a ${data.villas_afectadas} villa(s)${detalleCuotaEspecial}.`)
+      const detalleExentas = data.villas_exentas.length > 0
+        ? ` Exentas por alquiler de España: ${data.villas_exentas.join(', ')}.`
+        : ''
+      toast.success(`Cargo aplicado a ${data.villas_afectadas} villa(s)${detalleCuotaEspecial}.${detalleExentas}`)
     } else {
       const { data } = await api.post('/api/movimientos', {
         CLV_CLIE: form.CLV_CLIE,
@@ -322,8 +330,15 @@ useEscapeKey(() => emit('close'))
           <div v-else class="space-y-2">
             <div class="rounded-lg border border-gold-300/40 bg-brand-50/50 px-3 py-2.5 text-sm text-espresso-700">
               Se aplicará este cargo a
-              <strong>{{ villasConAplicobro.length }} villa{{ villasConAplicobro.length === 1 ? '' : 's' }}</strong>
+              <strong>{{ villasACobrarEnTodas }} villa{{ villasACobrarEnTodas === 1 ? '' : 's' }}</strong>
               con "Aplicar cuota mensual" activado.
+            </div>
+            <div v-if="villasAlquiladasEnTodas.length > 0" class="rounded-lg border border-gold-300/40 bg-cream-100 px-3 py-2.5 text-sm text-espresso-700/80">
+              <strong>{{ villasAlquiladasEnTodas.length }}</strong>
+              {{ villasAlquiladasEnTodas.length === 1 ? 'villa alquilada' : 'villas alquiladas' }} a España no pagarán la cuota
+              (quedará "Exenta por alquiler de España" en su estado de cuenta):
+              <strong>{{ villasAlquiladasEnTodas.map((v) => v.villa).join(', ') }}</strong>.
+              Se marcan en Configuración → Villas alquiladas.
             </div>
             <div v-if="villasConCuotaEspecialEnTodas.length > 0" class="rounded-lg border border-gold-300/40 bg-cream-100 px-3 py-2.5 text-sm text-espresso-700/80">
               <strong>{{ villasConCuotaEspecialEnTodas.length }}</strong> de ellas
@@ -376,7 +391,7 @@ useEscapeKey(() => emit('close'))
             :disabled="guardando || mantenimientoSinConfigurar"
             class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-50"
           >
-            {{ guardando ? 'Aplicando...' : modo === 'todas' ? `Aplicar a ${villasConAplicobro.length} villas` : 'Aplicar' }}
+            {{ guardando ? 'Aplicando...' : modo === 'todas' ? `Aplicar a ${villasACobrarEnTodas} villas` : 'Aplicar' }}
           </button>
         </div>
       </form>

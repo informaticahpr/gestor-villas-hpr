@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
 use App\Models\Concepto;
+use App\Models\ExencionCuota;
 use App\Models\Movimiento;
 use App\Models\Villa;
 use App\Services\CorrelativoService;
@@ -199,6 +200,28 @@ class MovimientoController extends Controller
         $villas = Villa::where('APLICOBRO', true)->get();
         $villasConCuotaEspecial = 0;
 
+        // Villas alquiladas a España (Configuracion -> Villas alquiladas): no se les cobra la cuota de
+        // mantenimiento; queda la exencion del mes, que se ve en su estado de cuenta. Los demas cargos
+        // aplicados a todas (no de mantenimiento) si se les cobran.
+        $exentas = collect();
+        if ($concepto->ES_MANTENIMIENTO) {
+            [$exentas, $villas] = $villas->partition(fn (Villa $v) => $v->ALQUILADA);
+            foreach ($exentas as $villa) {
+                ExencionCuota::firstOrCreate(
+                    ['CLV_CLIE' => $villa->CLV_CLIE, 'ANIO' => $fecha->year, 'MES' => $fecha->month],
+                    ['FECHA' => $fecha->toDateString(), 'MOTIVO' => ExencionCuota::MOTIVO_ALQUILER_ESPANA, 'USUARIO_ID' => $request->user()->id],
+                );
+            }
+            if ($exentas->isNotEmpty()) {
+                Bitacora::registrar(
+                    'villa_alquilada',
+                    'crear',
+                    'Cuota de mantenimiento de '.$fecha->locale('es')->translatedFormat('F Y').' no cobrada a '.$exentas->count()
+                        .' villa(s) alquilada(s) a España: '.Villa::enOrdenNatural($exentas)->pluck('CLV_CLIE')->join(', ').'.',
+                );
+            }
+        }
+
         foreach ($villas as $villa) {
             // "Cuota especial" no exime a la villa del cargo masivo -- solo cambia el
             // monto que se le cobra, y unicamente en la cuota de mantenimiento
@@ -228,6 +251,7 @@ class MovimientoController extends Controller
         return response()->json([
             'villas_afectadas' => $villas->count(),
             'villas_con_cuota_especial' => $villasConCuotaEspecial,
+            'villas_exentas' => Villa::enOrdenNatural($exentas)->pluck('CLV_CLIE')->values(),
             'concepto' => $concepto,
         ], 201);
     }

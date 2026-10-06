@@ -45,7 +45,6 @@
     </table>
             </td>
             <td class="folio">
-                <div class="tipo">Folio</div>
                 <div class="numero">{{ $movimiento->correlativo_texto ?? '—' }}</div>
             </td>
         </tr>

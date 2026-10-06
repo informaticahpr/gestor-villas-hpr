@@ -110,7 +110,7 @@ const iconConfig =
             Reimpresión
           </RouterLink>
           <RouterLink
-            v-if="auth.esDirectorOAdmin()"
+            v-if="auth.puedeVerConfiguracion()"
             :to="{ name: 'configuracion' }"
             class="flex items-center gap-1.5 rounded-full px-4 py-1.5 font-medium text-espresso-700 transition hover:bg-white hover:text-brand-700 hover:shadow-sm"
             active-class="!bg-gradient-to-r !from-wine-500 !via-brand-500 !to-gold-500 !text-white !shadow-sm"

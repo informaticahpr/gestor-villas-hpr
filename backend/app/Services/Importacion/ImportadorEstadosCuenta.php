@@ -521,7 +521,8 @@ class ImportadorEstadosCuenta
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM conceptos WHERE \"ES_MANTENIMIENTO\" = true) THEN RAISE EXCEPTION 'No existe el concepto de cuota de mantenimiento.'; END IF; END \$\$;";
         $s[] = '';
         $s[] = '-- limpieza: se borra todo lo de villas y se reinician los correlativos';
-        $s[] = 'TRUNCATE TABLE movimientos, villa_historial, encargados, villas, propietarios RESTART IDENTITY;';
+        // CASCADE: tambien vacia las tablas que dependen de las villas (ej. exenciones_cuota)
+        $s[] = 'TRUNCATE TABLE movimientos, villa_historial, encargados, villas, propietarios RESTART IDENTITY CASCADE;';
         // la tabla se llamaba folio_counters antes de la migracion que la renombro a correlativos:
         // el script sirve con cualquiera de las dos (antes o despues del despliegue)
         $s[] = "DO \$\$ BEGIN IF to_regclass('correlativos') IS NOT NULL THEN UPDATE correlativos SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); ELSE UPDATE folio_counters SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); END IF; END \$\$;";

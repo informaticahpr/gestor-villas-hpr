@@ -3,6 +3,8 @@ export interface VillaResumen {
   nombre_completo: string
   saldo: number
   aplicobro: boolean
+  /** Alquilada a España: exenta de la cuota de mantenimiento (Configuración → Villas alquiladas) */
+  alquilada: boolean
   cuota_especial: boolean
   monto_cuota_especial: number | null
 }
@@ -82,9 +84,11 @@ export interface VillaDetalle {
 }
 
 export interface MovimientoFila {
-  id: number
+  /** null en las lineas de exencion (no son movimientos) */
+  id: number | null
   correlativo: string | null
-  tipo: 'cargo' | 'credito'
+  /** 'exencion': mes sin cuota por alquiler de España (sin monto, no cambia el saldo) */
+  tipo: 'cargo' | 'credito' | 'exencion'
   fecha: string
   descripcion: string
   observacion: string | null
@@ -115,7 +119,7 @@ export interface FormaPago {
   activo: boolean
 }
 
-export type EntidadBitacora = 'usuario' | 'concepto' | 'forma_pago' | 'cuota_especial' | 'cuota_mantenimiento' | 'movimiento'
+export type EntidadBitacora = 'usuario' | 'concepto' | 'forma_pago' | 'cuota_especial' | 'cuota_mantenimiento' | 'movimiento' | 'villa_alquilada'
 export type AccionBitacora = 'crear' | 'editar' | 'activar' | 'desactivar' | 'eliminar' | 'anular'
 
 export interface MetaPaginacion {

@@ -29,7 +29,7 @@ const router = createRouter({
           path: 'configuracion',
           name: 'configuracion',
           component: ConfiguracionView,
-          meta: { requiereAdmin: true },
+          meta: { requiereConfiguracion: true },
         },
       ],
     },
@@ -51,7 +51,7 @@ router.beforeEach(async (to) => {
     return { name: 'home' }
   }
 
-  if (to.meta.requiereAdmin && !auth.esDirectorOAdmin()) {
+  if (to.meta.requiereConfiguracion && !auth.puedeVerConfiguracion()) {
     return { name: 'home' }
   }
 

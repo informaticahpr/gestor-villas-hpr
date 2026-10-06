@@ -53,6 +53,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reportes/por-concepto/exportar', [ReporteController::class, 'exportarPorConceptoXlsx']);
     Route::get('/reportes/por-concepto/pdf', [ReporteController::class, 'porConceptoPdf']);
 
+    // Configuracion -> Villas alquiladas: tambien el Supervisor (es lo unico de Configuracion que ve)
+    Route::patch('/villas/{villa}/alquilada', [VillaController::class, 'actualizarAlquilada'])
+        ->middleware('role:'.Role::DIRECTOR.','.Role::ADMIN.','.Role::SUPERVISOR);
+
     Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN)->group(function () {
         Route::patch('/movimientos/{movimiento}/anular', [MovimientoController::class, 'anular']);
 

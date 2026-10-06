@@ -266,6 +266,30 @@ class VillaController extends Controller
     }
 
     /**
+     * Configuracion -> Villas alquiladas: marca o desmarca la villa como alquilada a España. Mientras
+     * este marcada, la cuota de mantenimiento que se aplica a todas no se le cobra (queda exenta).
+     * Lo pueden hacer el Supervisor, el Director y el Administrador.
+     */
+    public function actualizarAlquilada(Request $request, string $villa)
+    {
+        $villa = Villa::findOrFail($villa);
+        $data = $request->validate(['ALQUILADA' => ['required', 'boolean']]);
+
+        if ($villa->ALQUILADA !== (bool) $data['ALQUILADA']) {
+            $villa->update($data);
+            Bitacora::registrar(
+                'villa_alquilada',
+                $data['ALQUILADA'] ? 'activar' : 'desactivar',
+                $data['ALQUILADA']
+                    ? "Marcó la villa {$villa->CLV_CLIE} como alquilada a España (exenta de la cuota de mantenimiento)."
+                    : "Desmarcó la villa {$villa->CLV_CLIE} como alquilada a España (vuelve a pagar la cuota de mantenimiento).",
+            );
+        }
+
+        return response()->json(['villa' => $villa->CLV_CLIE, 'alquilada' => (bool) $villa->ALQUILADA]);
+    }
+
+    /**
      * Solo letras (con acentos/eñe) y espacios -- sin digitos ni simbolos.
      */
     private const REGEX_SOLO_LETRAS = 'regex:/^[\pL\s]+$/u';
@@ -430,6 +454,7 @@ class VillaController extends Controller
             'nombre_completo' => $villa->nombre_completo,
             'saldo' => $saldo,
             'aplicobro' => (bool) $villa->APLICOBRO,
+            'alquilada' => (bool) $villa->ALQUILADA,
             'cuota_especial' => (bool) $villa->CUOTA_ESPECIAL,
             'monto_cuota_especial' => $villa->MONTO_CUOTA_ESPECIAL !== null ? (float) $villa->MONTO_CUOTA_ESPECIAL : null,
         ];

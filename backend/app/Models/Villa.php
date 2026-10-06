@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 #[Fillable([
     'CLV_CLIE', 'PROPIETARIO_ID', 'DIR', 'FCONTRUC', 'NOMED', 'CLAVE_CATASTRAL', 'DESCRIPCION_IP', 'OBSERVACION',
-    'NOHAB', 'NOBATH', 'APLICOBRO', 'CUOTA_ESPECIAL', 'MONTO_CUOTA_ESPECIAL', 'SALDO',
+    'NOHAB', 'NOBATH', 'APLICOBRO', 'ALQUILADA', 'CUOTA_ESPECIAL', 'MONTO_CUOTA_ESPECIAL', 'SALDO',
 ])]
 class Villa extends Model
 {
@@ -36,6 +36,7 @@ class Villa extends Model
             'FCONTRUC' => 'date',
             'SALDO' => 'decimal:2',
             'APLICOBRO' => 'boolean',
+            'ALQUILADA' => 'boolean',
             'CUOTA_ESPECIAL' => 'boolean',
             'MONTO_CUOTA_ESPECIAL' => 'decimal:2',
         ];

@@ -22,6 +22,15 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.rol === 'Admin'
   }
 
+  function esSupervisor(): boolean {
+    return user.value?.rol === 'Supervisor'
+  }
+
+  /** Configuración completa: Director y Admin. El Supervisor solo ve "Villas alquiladas". */
+  function puedeVerConfiguracion(): boolean {
+    return esDirectorOAdmin() || esSupervisor()
+  }
+
   async function fetchUser(): Promise<void> {
     try {
       const { data } = await api.get('/api/user')
@@ -49,5 +58,5 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, cargando, listo, esDirectorOAdmin, esAdmin, fetchUser, login, logout }
+  return { user, cargando, listo, esDirectorOAdmin, esAdmin, esSupervisor, puedeVerConfiguracion, fetchUser, login, logout }
 })
