@@ -9,6 +9,15 @@
         .sin-corte { page-break-inside: avoid; }
         /* linea arriba de Fecha / Descripcion / ... para separarlos del nombre de la villa */
         table.datos tr.columnas th { border-top: 1px solid #000000; }
+        /* anchos en % (con table-layout fixed, dompdf reparte parejo si no suman 100%): fecha justa, montos
+           hasta -$99,999.99 sin partirse y la descripcion con el resto */
+        table.estado .c-fecha { width: 12%; }
+        table.estado .c-desc { width: 49%; }
+        table.estado .c-monto { width: 12.5%; }
+        table.estado .c-saldo { width: 14%; }
+        /* nombre de la villa y saldo a la fecha, en una linea arriba de la tabla */
+        table.titulo-villa { width: 100%; }
+        table.titulo-villa td { padding: 4px 7px; font-weight: bold; color: #000000; }
 @endsection
 
 @section('contenido')
@@ -36,21 +45,20 @@
 
         {{-- cabeza: titulo, encabezado de columnas, saldo inicial y primeras filas --}}
         <div class="sin-corte" style="margin-top: {{ $loop->first ? 0 : 18 }}px;">
+            <table class="titulo-villa">
+                <tr>
+                    <td style="font-size: 12px;">Villa #{{ $r['villa'] }} — {{ $r['propietario'] }}</td>
+                    <td class="der" style="font-size: 13px;">Saldo a la fecha: {{ Formato::monto($r['saldo_actual']) }}</td>
+                </tr>
+            </table>
             <table class="datos estado">
-                <colgroup>
-                    <col style="width: 62px;"><col><col style="width: 76px;"><col style="width: 76px;"><col style="width: 82px;">
-                </colgroup>
                 <thead>
-                    <tr>
-                        <th colspan="3" style="font-size: 12px; border-bottom: none;">Villa #{{ $r['villa'] }} — {{ $r['propietario'] }}</th>
-                        <th colspan="2" class="der" style="font-size: 13px; border-bottom: none;">Saldo a la fecha: {{ Formato::monto($r['saldo_actual']) }}</th>
-                    </tr>
                     <tr class="columnas">
-                        <th>Fecha</th>
-                        <th>Descripción</th>
-                        <th class="der">Cargo</th>
-                        <th class="der">Crédito</th>
-                        <th class="der">Saldo</th>
+                        <th class="c-fecha">Fecha</th>
+                        <th class="c-desc">Descripción</th>
+                        <th class="der c-monto">Cargo</th>
+                        <th class="der c-monto">Crédito</th>
+                        <th class="der c-saldo">Saldo</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -73,9 +81,6 @@
             {{-- medio: puede partirse entre paginas --}}
             @if ($medio->isNotEmpty())
                 <table class="datos estado">
-                    <colgroup>
-                        <col style="width: 62px;"><col><col style="width: 76px;"><col style="width: 76px;"><col style="width: 82px;">
-                    </colgroup>
                     <tbody>
                         @include('reportes._filas-estado', ['filas' => $medio, 'offset' => $filasCabeza])
                     </tbody>
@@ -85,9 +90,6 @@
             {{-- cola: ultimas filas y saldo final, siempre juntas --}}
             <div class="sin-corte">
                 <table class="datos estado">
-                    <colgroup>
-                        <col style="width: 62px;"><col><col style="width: 76px;"><col style="width: 76px;"><col style="width: 82px;">
-                    </colgroup>
                     <tbody>
                         @include('reportes._filas-estado', ['filas' => $cola, 'offset' => $total - $filasCola])
                         <tr class="saldo-final">

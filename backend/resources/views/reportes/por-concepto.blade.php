@@ -1,19 +1,24 @@
 @extends('layouts.pdf')
 @use('App\Support\Formato')
 
+@section('estilos')
+        /* anchos en % (suman 100): fecha, folio y villa justos; la descripcion con el resto */
+        table.concepto { table-layout: fixed; }
+@endsection
+
 @section('contenido')
-    <table class="datos">
+    <table class="datos concepto">
         <thead>
             <tr>
-                <th style="width: 62px;">Fecha</th>
-                <th style="width: 72px;">Folio</th>
-                <th style="width: 44px;">Villa</th>
-                <th style="width: 150px;">Propietario</th>
-                <th>Descripción</th>
+                <th style="width: 8%;">Fecha</th>
+                <th style="width: 9%;">Folio</th>
+                <th style="width: 5%;">Villa</th>
+                <th style="width: 20%;">Propietario</th>
+                <th style="width: {{ $esCargo ? 49 : 39 }}%;">Descripción</th>
                 @unless ($esCargo)
-                    <th style="width: 80px;">Forma de pago</th>
+                    <th style="width: 10%;">Forma de pago</th>
                 @endunless
-                <th class="der" style="width: 80px;">Importe</th>
+                <th class="der" style="width: 9%;">Importe</th>
             </tr>
         </thead>
         <tbody>
