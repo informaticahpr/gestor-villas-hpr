@@ -753,7 +753,7 @@ onMounted(() => {
         :class="tab === 'alquiladas' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
         @click="tab = 'alquiladas'"
       >
-        Villas alquiladas a producción
+        Villas Alquiladas
       </button>
       <template v-if="auth.esDirectorOAdmin()">
       <button
