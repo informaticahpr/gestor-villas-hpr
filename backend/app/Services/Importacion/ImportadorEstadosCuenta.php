@@ -557,14 +557,15 @@ class ImportadorEstadosCuenta
         $s[] = '-- Importacion de estados de cuenta desde Excel. Generado '.now()->format('d/m/Y H:i').'.';
         $s[] = '-- ATENCION: BORRA todas las villas, propietarios, encargados, historial y movimientos y los vuelve a cargar.';
         $s[] = '-- Ejecutar completo en DBeaver con Alt+X. Si algo falla, no se borra ni se carga nada (ROLLBACK).';
+        // para toda la conexion (no LOCAL): la verificacion del final corre despues del COMMIT
+        $s[] = 'SET search_path TO public;';
         $s[] = 'BEGIN;';
-        $s[] = 'SET LOCAL search_path TO public;';
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'villas' AND column_name = 'OBSERVACION') THEN RAISE EXCEPTION 'Railway todavía no tiene la última versión del sistema (falta la columna OBSERVACION de villas). Espera a que termine el despliegue y vuelve a correr el script.'; END IF; END \$\$;";
         $s[] = "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM conceptos WHERE \"ES_MANTENIMIENTO\" = true) THEN RAISE EXCEPTION 'No existe el concepto de cuota de mantenimiento.'; END IF; END \$\$;";
         $s[] = '';
         $s[] = '-- limpieza: se borra todo lo de villas y se reinician los correlativos';
         // CASCADE: tambien vacia las tablas que dependen de las villas (ej. exenciones_cuota)
-        $s[] = 'TRUNCATE TABLE movimientos, villa_historial, encargados, villas, propietarios RESTART IDENTITY CASCADE;';
+        $s[] = 'TRUNCATE TABLE movimientos, exenciones_cuota, villa_historial, encargados, villas, propietarios RESTART IDENTITY CASCADE;';
         // la tabla se llamaba folio_counters antes de la migracion que la renombro a correlativos:
         // el script sirve con cualquiera de las dos (antes o despues del despliegue)
         $s[] = "DO \$\$ BEGIN IF to_regclass('correlativos') IS NOT NULL THEN UPDATE correlativos SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); ELSE UPDATE folio_counters SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); END IF; END \$\$;";
@@ -576,6 +577,8 @@ class ImportadorEstadosCuenta
         }
         $s[] = "INSERT INTO conceptos (\"DESCR\", \"ES_CARGO\", \"ACTIVO\", \"ES_MANTENIMIENTO\") SELECT {$q(self::NOMBRE_ENERGIA)}, true, true, false WHERE NOT EXISTS (SELECT 1 FROM conceptos WHERE {$normalizado('"DESCR"')} = 'energia electrica');";
         $s[] = '';
+        // si una corrida anterior fallo en la misma conexion de DBeaver, la tabla temporal puede seguir ahi
+        $s[] = 'DROP TABLE IF EXISTS pg_temp.imp_prop;';
         $s[] = 'CREATE TEMP TABLE imp_prop (clave text PRIMARY KEY, id bigint) ON COMMIT DROP;';
         foreach ($plan['propietarios'] as $clave => $p) {
             $s[] = "WITH ins AS (INSERT INTO propietarios (\"NOMBRES\", \"APELLIDOS\", created_at, updated_at) VALUES ({$q($p['NOMBRES'])}, {$q($p['APELLIDOS'])}, now(), now()) RETURNING id) INSERT INTO imp_prop SELECT {$q($clave)}, id FROM ins;";
