@@ -79,20 +79,23 @@ const iconConfig =
             <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 shrink-0"><path :d="iconBuscar" /></svg>
             Buscar Villa
           </RouterLink>
-          <button
-            class="flex items-center gap-1.5 rounded-full px-4 py-1.5 font-medium text-espresso-700 transition hover:bg-white hover:text-brand-700 hover:shadow-sm"
-            @click="ui.mostrarCrearVilla = true"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 shrink-0"><path :d="iconCrear" /></svg>
-            Crear Villa
-          </button>
-          <button
-            class="flex items-center gap-1.5 rounded-full px-4 py-1.5 font-medium text-espresso-700 transition hover:bg-white hover:text-brand-700 hover:shadow-sm"
-            @click="ui.mostrarMovimiento = true"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 shrink-0"><path :d="iconCargo" /></svg>
-            Cargo/Crédito
-          </button>
+          <!-- el Consultor es solo lectura: no crea villas ni aplica cargos/créditos -->
+          <template v-if="!auth.esConsultor()">
+            <button
+              class="flex items-center gap-1.5 rounded-full px-4 py-1.5 font-medium text-espresso-700 transition hover:bg-white hover:text-brand-700 hover:shadow-sm"
+              @click="ui.mostrarCrearVilla = true"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 shrink-0"><path :d="iconCrear" /></svg>
+              Crear Villa
+            </button>
+            <button
+              class="flex items-center gap-1.5 rounded-full px-4 py-1.5 font-medium text-espresso-700 transition hover:bg-white hover:text-brand-700 hover:shadow-sm"
+              @click="ui.mostrarMovimiento = true"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 shrink-0"><path :d="iconCargo" /></svg>
+              Cargo/Crédito
+            </button>
+          </template>
           <RouterLink
             :to="{ name: 'reportes' }"
             class="flex items-center gap-1.5 rounded-full px-4 py-1.5 font-medium text-espresso-700 transition hover:bg-white hover:text-brand-700 hover:shadow-sm"

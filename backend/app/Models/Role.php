@@ -13,4 +13,6 @@ class Role extends Model
     public const DIRECTOR = 'Director';
     public const ADMIN = 'Admin';
     public const SUPERVISOR = 'Supervisor';
+    // solo lectura: villas, estado de cuenta por villa y reimpresion; no modifica, carga, anula ni cobra nada
+    public const CONSULTOR = 'Consultor';
 }

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../lib/api'
 import type { VillaResumen, EstadoCuenta, MovimientoFila, Concepto } from '../types'
+import { useAuthStore } from '../stores/auth'
 import { useDataStore } from '../stores/data'
 import { useToastStore } from '../stores/toast'
 import { formatearMonto } from '../lib/format'
@@ -13,10 +14,13 @@ import ExportarBotones from '../components/ExportarBotones.vue'
 import VillaBuscador from '../components/VillaBuscador.vue'
 import ObservacionModal from '../components/ObservacionModal.vue'
 
+const auth = useAuthStore()
 const dataStore = useDataStore()
 const toast = useToastStore()
 
 const tab = ref<'estado' | 'general' | 'antiguedad' | 'concepto'>('estado')
+// el Consultor solo ve el estado de cuenta por villa (los demas reportes le dan 403)
+const soloEstadoCuenta = auth.esConsultor()
 
 // fechas por defecto en la zona de la app (Tegucigalpa), no en UTC
 function hoy(): string {
@@ -222,13 +226,14 @@ function exportarPorConcepto(formato: FormatoExportacion) {
 
 async function cargarTodo() {
   await generarEstadoCuenta()
+  if (soloEstadoCuenta) return
   await generarSaldoGeneral()
   await generarAntiguedad()
 }
 
 onMounted(() => {
   cargarTodo()
-  cargarConceptos()
+  if (!soloEstadoCuenta) cargarConceptos()
 })
 
 // se refresca sola si se aplica un cargo/abono o se crea/edita una villa
@@ -251,27 +256,29 @@ watch(() => dataStore.version, () => {
       >
         Estado de Cuenta
       </button>
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'general' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'general'"
-      >
-        Saldos Generales
-      </button>
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'antiguedad' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'antiguedad'"
-      >
-        Antigüedad de Saldos
-      </button>
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'concepto' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'concepto'"
-      >
-        Por Concepto
-      </button>
+      <template v-if="!soloEstadoCuenta">
+        <button
+          class="border-b-2 px-1 pb-2 font-medium"
+          :class="tab === 'general' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
+          @click="tab = 'general'"
+        >
+          Saldos Generales
+        </button>
+        <button
+          class="border-b-2 px-1 pb-2 font-medium"
+          :class="tab === 'antiguedad' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
+          @click="tab = 'antiguedad'"
+        >
+          Antigüedad de Saldos
+        </button>
+        <button
+          class="border-b-2 px-1 pb-2 font-medium"
+          :class="tab === 'concepto' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
+          @click="tab = 'concepto'"
+        >
+          Por Concepto
+        </button>
+      </template>
     </div>
 
     <!-- Por concepto -->

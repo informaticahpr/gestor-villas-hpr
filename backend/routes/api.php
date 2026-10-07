@@ -22,12 +22,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::get('/hoy', HoyController::class);
-    // todos los roles; el Supervisor solo recibe los indicadores basicos (ver DashboardController)
+    // todos los roles; Supervisor y Consultor solo reciben los indicadores basicos (ver DashboardController)
     Route::get('/dashboard', DashboardController::class);
 
     Route::get('/villas', [VillaController::class, 'index']);
     Route::get('/villas/{villa}', [VillaController::class, 'show']);
-    Route::post('/villas', [VillaController::class, 'store']);
 
     Route::get('/propietarios', [PropietarioController::class, 'index']);
 
@@ -36,22 +35,28 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/formas-pago', [FormaPagoController::class, 'index']);
 
     Route::get('/movimientos', [MovimientoController::class, 'index']);
-    Route::post('/movimientos', [MovimientoController::class, 'store']);
-    Route::post('/movimientos/aplicar-a-todas', [MovimientoController::class, 'aplicarATodas']);
     Route::get('/movimientos/{movimiento}/recibo', [ReciboController::class, 'pdf']);
 
     Route::get('/reportes/estado-cuenta', [ReporteController::class, 'estadoCuenta']);
     Route::get('/reportes/estado-cuenta/exportar', [ReporteController::class, 'exportarEstadoCuentaXlsx']);
     Route::get('/reportes/estado-cuenta/pdf', [ReporteController::class, 'estadoCuentaPdf']);
-    Route::get('/reportes/saldos-generales', [ReporteController::class, 'saldosGenerales']);
-    Route::get('/reportes/saldos-generales/exportar', [ReporteController::class, 'exportarSaldosXlsx']);
-    Route::get('/reportes/saldos-generales/pdf', [ReporteController::class, 'saldosGeneralesPdf']);
-    Route::get('/reportes/antiguedad-saldos', [ReporteController::class, 'antiguedadSaldos']);
-    Route::get('/reportes/antiguedad-saldos/exportar', [ReporteController::class, 'exportarAntiguedadXlsx']);
-    Route::get('/reportes/antiguedad-saldos/pdf', [ReporteController::class, 'antiguedadSaldosPdf']);
-    Route::get('/reportes/por-concepto', [ReporteController::class, 'porConcepto']);
-    Route::get('/reportes/por-concepto/exportar', [ReporteController::class, 'exportarPorConceptoXlsx']);
-    Route::get('/reportes/por-concepto/pdf', [ReporteController::class, 'porConceptoPdf']);
+
+    // todos menos el Consultor (solo lectura: villas, estado de cuenta por villa y reimpresion)
+    Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN.','.Role::SUPERVISOR)->group(function () {
+        Route::post('/villas', [VillaController::class, 'store']);
+        Route::post('/movimientos', [MovimientoController::class, 'store']);
+        Route::post('/movimientos/aplicar-a-todas', [MovimientoController::class, 'aplicarATodas']);
+
+        Route::get('/reportes/saldos-generales', [ReporteController::class, 'saldosGenerales']);
+        Route::get('/reportes/saldos-generales/exportar', [ReporteController::class, 'exportarSaldosXlsx']);
+        Route::get('/reportes/saldos-generales/pdf', [ReporteController::class, 'saldosGeneralesPdf']);
+        Route::get('/reportes/antiguedad-saldos', [ReporteController::class, 'antiguedadSaldos']);
+        Route::get('/reportes/antiguedad-saldos/exportar', [ReporteController::class, 'exportarAntiguedadXlsx']);
+        Route::get('/reportes/antiguedad-saldos/pdf', [ReporteController::class, 'antiguedadSaldosPdf']);
+        Route::get('/reportes/por-concepto', [ReporteController::class, 'porConcepto']);
+        Route::get('/reportes/por-concepto/exportar', [ReporteController::class, 'exportarPorConceptoXlsx']);
+        Route::get('/reportes/por-concepto/pdf', [ReporteController::class, 'porConceptoPdf']);
+    });
 
     // Configuracion -> Villas alquiladas: tambien el Supervisor (es lo unico de Configuracion que ve)
     Route::patch('/villas/{villa}/alquilada', [VillaController::class, 'actualizarAlquilada'])

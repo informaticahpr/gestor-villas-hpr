@@ -26,6 +26,11 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.rol === 'Supervisor'
   }
 
+  /** Solo lectura: villas, estado de cuenta por villa y reimpresion. No crea, carga, anula ni cobra nada. */
+  function esConsultor(): boolean {
+    return user.value?.rol === 'Consultor'
+  }
+
   /** Configuración completa: Director y Admin. El Supervisor solo ve "Villas alquiladas a producción". */
   function puedeVerConfiguracion(): boolean {
     return esDirectorOAdmin() || esSupervisor()
@@ -58,5 +63,5 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, cargando, listo, esDirectorOAdmin, esAdmin, esSupervisor, puedeVerConfiguracion, fetchUser, login, logout }
+  return { user, cargando, listo, esDirectorOAdmin, esAdmin, esSupervisor, esConsultor, puedeVerConfiguracion, fetchUser, login, logout }
 })

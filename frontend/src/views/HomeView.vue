@@ -21,10 +21,12 @@ interface Dashboard {
   fecha: string
   villas: number
   cuota_mantenimiento: number | null
-  cuentas_por_cobrar: number
+  /** No le llega al Consultor */
+  cuentas_por_cobrar?: number
   /** Solo Director/Admin */
   saldo_a_favor?: number
-  mes: Periodo
+  /** No le llega al Consultor */
+  mes?: Periodo
   /** Solo Director/Admin */
   anio?: Periodo & { anio: number; meses: (Periodo & { mes: number })[] }
 }
@@ -33,7 +35,7 @@ const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'O
 const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 // Todos ven el dashboard; al Supervisor el backend solo le manda villas, cuota, cuentas por cobrar y
-// lo recuperado en el mes (saldo a favor y el año son de Director/Admin).
+// lo recuperado en el mes (saldo a favor y el año son de Director/Admin); al Consultor, solo villas y cuota.
 const dashboard = ref<Dashboard | null>(null)
 const errorDashboard = ref(false)
 
@@ -81,7 +83,7 @@ const tarjeta =
 const icono =
   'flex items-center justify-center rounded-lg bg-gradient-to-br from-wine-500 via-brand-500 to-gold-500 text-white shadow-sm'
 
-const acciones = [
+const todasLasAcciones = [
   {
     titulo: 'Buscar Villa',
     descripcion: 'Buscar por # de villa o propietario',
@@ -92,17 +94,19 @@ const acciones = [
     titulo: 'Crear Villa',
     descripcion: 'Registrar una nueva villa',
     accion: () => (ui.mostrarCrearVilla = true),
+    soloOperar: true,
     icon: 'M12 4a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H5a1 1 0 110-2h6V5a1 1 0 011-1z',
   },
   {
     titulo: 'Cargo/Crédito',
     descripcion: 'Aplicar un cargo o abono',
     accion: () => (ui.mostrarMovimiento = true),
+    soloOperar: true,
     icon: 'M7 8a3 3 0 013-3h7a1 1 0 010 2h-7a1 1 0 000 2h4a3 3 0 010 6h-1a1 1 0 110-2h1a1 1 0 000-2h-4a3 3 0 01-3-3zm0 9a1 1 0 011-1h9a1 1 0 110 2H8a1 1 0 01-1-1z',
   },
   {
     titulo: 'Reportes',
-    descripcion: 'Estados de cuenta y saldos generales',
+    descripcion: auth.esConsultor() ? 'Estados de cuenta por villa' : 'Estados de cuenta y saldos generales',
     accion: () => router.push({ name: 'reportes' }),
     icon: 'M4 20V10a1 1 0 112 0v10a1 1 0 11-2 0zm7 0V4a1 1 0 112 0v16a1 1 0 11-2 0zm7 0v-7a1 1 0 112 0v7a1 1 0 11-2 0z',
   },
@@ -115,6 +119,9 @@ const acciones = [
     outline: true,
   },
 ]
+
+// el Consultor es solo lectura: sin Crear Villa ni Cargo/Crédito
+const acciones = computed(() => todasLasAcciones.filter((a) => !(a.soloOperar && auth.esConsultor())))
 </script>
 
 <template>
@@ -142,7 +149,7 @@ const acciones = [
 
       <template v-else>
         <!-- Indicadores -->
-        <div class="grid grid-cols-2 gap-4" :class="dashboard.saldo_a_favor !== undefined ? 'lg:grid-cols-4' : 'lg:grid-cols-3'">
+        <div class="grid grid-cols-2 gap-4" :class="dashboard.saldo_a_favor !== undefined ? 'lg:grid-cols-4' : dashboard.cuentas_por_cobrar !== undefined ? 'lg:grid-cols-3' : ''">
           <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-4 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Villas registradas</p>
             <p class="mt-2 font-display text-2xl font-semibold text-espresso-800 tabular-nums">{{ dashboard.villas }}</p>
@@ -154,7 +161,7 @@ const acciones = [
             </p>
             <p class="mt-0.5 text-xs text-espresso-800/45">mensual</p>
           </div>
-          <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-4 shadow-sm">
+          <div v-if="dashboard.cuentas_por_cobrar !== undefined" class="rounded-xl border border-gold-300/30 bg-cream-50 p-4 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Cuentas por cobrar</p>
             <p class="mt-2 font-display text-2xl font-semibold text-espresso-800 tabular-nums">{{ formatearMonto(dashboard.cuentas_por_cobrar) }}</p>
             <p class="mt-0.5 text-xs text-espresso-800/45">saldo a la fecha</p>
@@ -167,7 +174,7 @@ const acciones = [
         </div>
 
         <!-- Recuperado: mes y año -->
-        <div class="mt-4 grid grid-cols-1 gap-4" :class="dashboard.anio ? 'lg:grid-cols-3' : ''">
+        <div v-if="dashboard.mes" class="mt-4 grid grid-cols-1 gap-4" :class="dashboard.anio ? 'lg:grid-cols-3' : ''">
           <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Recuperado en {{ nombreMes }}</p>
             <p class="mt-2 font-display text-3xl font-semibold text-espresso-800 tabular-nums">{{ formatearMonto(dashboard.mes.recuperado) }}</p>

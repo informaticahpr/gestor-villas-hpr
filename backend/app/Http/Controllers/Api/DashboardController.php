@@ -10,11 +10,13 @@ use App\Models\Villa;
 use App\Services\SaldoService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 /**
  * Indicadores del inicio: villas registradas, cuota de mantenimiento, cuentas por cobrar y saldo a
  * favor a la fecha, y lo recuperado en el mes y en el año. El Supervisor solo recibe villas, cuota,
- * cuentas por cobrar y lo recuperado en el mes; el resto es para Director/Admin.
+ * cuentas por cobrar y lo recuperado en el mes; el resto es para Director/Admin. El Consultor solo
+ * recibe villas y cuota.
  *
  * "Recuperado" = creditos/abonos aplicados en el periodo, comparados contra los cargos (cuentas
  * por cobrar) generados en ese mismo periodo. Puede pasar del 100% cuando se cobra deuda de
@@ -71,8 +73,15 @@ class DashboardController extends Controller
             ],
         ];
 
+        $rol = $request->user()?->role?->nombre;
+
+        // el Consultor solo ve las villas registradas y la cuota de mantenimiento
+        if ($rol === Role::CONSULTOR) {
+            return response()->json(Arr::only($datos, ['fecha', 'villas', 'cuota_mantenimiento']));
+        }
+
         // el Supervisor no ve el saldo a favor ni lo recuperado en el año
-        if (! in_array($request->user()?->role?->nombre, [Role::DIRECTOR, Role::ADMIN], true)) {
+        if (! in_array($rol, [Role::DIRECTOR, Role::ADMIN], true)) {
             unset($datos['saldo_a_favor'], $datos['anio']);
         }
 
