@@ -99,31 +99,7 @@ class ImportadorEstadosCuenta
             }
             usort($lista, fn ($x, $y) => strcmp((string) $x['desde'], (string) $y['desde']));
 
-            // "Victor Gonzales / Luisa Reyes" o "Magaly Martinez y Jorge Max": la villa esta a nombre de
-            // varias personas. El propietario registrado es el primero y en la observacion de la villa se
-            // anota a nombre de quienes esta.
-            $nombres = fn (string $texto) => array_values(array_filter(array_map('trim', preg_split('/\s*\/\s*|\s+y\s+/iu', $texto))));
-            $titulares = $nombres(end($lista)['propietario']);
-            $villa['observacion'] = count($titulares) > 1
-                ? 'VILLA A NOMBRE DE: '.mb_strtoupper(implode(' / ', $titulares), 'UTF-8')
-                : null;
-            $personas = array_map(fn ($p) => $this->persona($nombres($p['propietario'])[0]) + ['desde' => $p['desde'] ?: null], $lista);
-
-            $actual = array_pop($personas);
-            $catalogoPropietarios[$actual['clave']] ??= $actual;
-            $villa['propietario'] = $actual['clave'];
-            $villa['propietario_desde'] = $actual['desde'];
-            $villa['anteriores'] = [];
-            foreach ($personas as $i => $p) {
-                $siguiente = $personas[$i + 1] ?? $actual;
-                if (! $siguiente['desde']) {
-                    // no se sabe cuando cambio: se deja la fecha de corte (el ultimo dato "viejo" del Excel)
-                    $villa['avisos'][] = "No se sabe la fecha en que {$p['clave']} dejó de ser propietario: en el historial queda hasta el ".Carbon::parse($corte)->format('d/m/Y').'.';
-                }
-                $villa['anteriores'][] = $p + ['hasta' => $siguiente['desde'] ?? $corte];
-            }
-
-            $villas[$codigo] = $villa;
+            $villas[$codigo] = $this->asignarPropietarios($villa, $lista, $corte, $catalogoPropietarios);
         }
 
         foreach (array_diff(array_keys($propietarios), array_keys($villas)) as $sinBloque) {
@@ -133,9 +109,63 @@ class ImportadorEstadosCuenta
         return [
             'corte' => $corte,
             'villas' => $villas,
-            'propietarios' => $catalogoPropietarios,
+            'propietarios' => $this->nombresDelCatalogo($catalogoPropietarios),
             'avisos' => $avisos,
         ];
+    }
+
+    /**
+     * Propietario actual (el ultimo de la lista) e historial (los anteriores, en orden) de una villa.
+     * Si la villa esta a nombre de varias personas ("Victor Gonzales / Luisa Reyes"), el propietario
+     * registrado es el primero y la observacion de la villa dice a nombre de quienes esta (ver
+     * NombrePropietario). La misma persona en varias villas es un solo propietario aunque su nombre
+     * venga escrito distinto.
+     *
+     * @param  list<array{propietario: string, desde: ?string}>  $lista  del mas antiguo al actual
+     * @param  string  $hastaDesconocido  fecha "hasta" del historial cuando no se sabe cuando cambio
+     */
+    public function asignarPropietarios(array $villa, array $lista, string $hastaDesconocido, array &$catalogo): array
+    {
+        $personas = array_map(fn ($p) => NombrePropietario::propietario($p['propietario']) + ['desde' => $p['desde'] ?: null], $lista);
+
+        $actual = array_pop($personas);
+        $catalogo[$actual['clave']][$actual['NOMBRES'].'|'.$actual['APELLIDOS']][] = $villa['codigo'];
+        $villa['propietario'] = $actual['clave'];
+        $villa['propietario_desde'] = $actual['desde'];
+        $villa['observacion'] = $actual['observacion'];
+        $villa['anteriores'] = [];
+        foreach ($personas as $i => $p) {
+            $siguiente = $personas[$i + 1] ?? $actual;
+            if (! $siguiente['desde']) {
+                $villa['avisos'][] = "No se sabe la fecha en que {$p['NOMBRES']} {$p['APELLIDOS']} dejó de ser propietario: en el historial queda hasta el ".Carbon::parse($hastaDesconocido)->format('d/m/Y').'.';
+            }
+            $villa['anteriores'][] = ['NOMBRES' => $p['NOMBRES'], 'APELLIDOS' => $p['APELLIDOS'], 'desde' => $p['desde'], 'hasta' => $siguiente['desde'] ?? $hastaDesconocido];
+        }
+
+        return $villa;
+    }
+
+    /**
+     * Catalogo de asignarPropietarios() -> clave => NOMBRES/APELLIDOS. Si la misma persona viene escrita
+     * de varias formas, se usa la que mas se repite (a igualdad, la primera).
+     *
+     * @return array<string, array{NOMBRES: string, APELLIDOS: string, variantes: array<string, list<string>>}>
+     */
+    public function nombresDelCatalogo(array $catalogo): array
+    {
+        $resultado = [];
+        foreach ($catalogo as $clave => $variantes) {
+            $mejor = array_key_first($variantes);
+            foreach ($variantes as $v => $villas) {
+                if (count($villas) > count($variantes[$mejor])) {
+                    $mejor = $v;
+                }
+            }
+            [$nombres, $apellidos] = explode('|', $mejor);
+            $resultado[$clave] = ['NOMBRES' => $nombres, 'APELLIDOS' => $apellidos, 'variantes' => $variantes];
+        }
+
+        return $resultado;
     }
 
     private function planVilla(string $codigo, array $bloque, string $corte, Carbon $hoy): array
@@ -399,39 +429,21 @@ class ImportadorEstadosCuenta
         return trim(preg_replace('/\s+/', ' ', trim($t, " /-")));
     }
 
-    /**
-     * Nombre completo -> NOMBRES / APELLIDOS (el sistema los guarda separados). Con 4+ palabras, las
-     * dos primeras son nombres; con 3, la primera; con 2, una y una. Empresas o una sola palabra
-     * quedan completas en NOMBRES. Se puede corregir despues desde la ficha del propietario.
-     */
-    private function persona(string $nombreCompleto): array
-    {
-        $limpio = mb_strtoupper(trim(preg_replace('/\s+/', ' ', $nombreCompleto)), 'UTF-8');
-        $palabras = explode(' ', $limpio);
-        // empresas o varias personas ("X Y Z", "A / B"): todo el texto queda en NOMBRES
-        $esEmpresa = (bool) preg_match('/\b(S\.?\s?A|S DE RL|GRUPO|INVERSIONES|CORREDURIA|PROMOTUR|INTERAMERICANA|FICOHSA|CONSTANCIA)\b|\/|\sY\s|\(/u', $limpio);
-        $n = count($palabras);
-        [$nombres, $apellidos] = match (true) {
-            $esEmpresa || $n === 1 => [$limpio, ''],
-            $n === 2 => [$palabras[0], $palabras[1]],
-            $n === 3 => [$palabras[0], $palabras[1].' '.$palabras[2]],
-            default => [implode(' ', array_slice($palabras, 0, 2)), implode(' ', array_slice($palabras, 2))],
-        };
-
-        return ['clave' => $limpio, 'NOMBRES' => mb_substr($nombres, 0, 60), 'APELLIDOS' => mb_substr($apellidos, 0, 60)];
-    }
-
     // ------------------------------------------------------------------------------ aplicar (BD actual)
 
-    public function aplicar(array $plan): void
+    /** @param  bool  $reemplazar  borra antes todas las villas, propietarios, historial y movimientos (como el script SQL) */
+    public function aplicar(array $plan, bool $reemplazar = false): void
     {
-        DB::transaction(function () use ($plan) {
+        DB::transaction(function () use ($plan, $reemplazar) {
+            if ($reemplazar) {
+                $this->vaciar();
+            }
             $existentes = Villa::whereIn('CLV_CLIE', array_keys($plan['villas']))->pluck('CLV_CLIE');
             if ($existentes->isNotEmpty()) {
                 throw new \RuntimeException('Estas villas ya existen en la base y no se sobrescriben: '.$existentes->join(', '));
             }
 
-            $conceptos = $this->asegurarConceptos();
+            $conceptos = $this->asegurarConceptos($plan);
             $formas = FormaPago::pluck('id', 'nombre');
             $ahora = now();
 
@@ -465,10 +477,37 @@ class ImportadorEstadosCuenta
         });
     }
 
-    /** @return array<string, int> DESCR (o la marca de mantenimiento) -> NUM_CPTO */
-    private function asegurarConceptos(): array
+    /** Lo mismo que hace el TRUNCATE del script SQL, en la base actual. */
+    private function vaciar(): void
     {
-        foreach (self::CONCEPTOS_IMPORTACION + ['Cargo extraordinario' => true, 'Mora' => true, 'Abono / Pago' => false] as $descr => $esCargo) {
+        foreach (['exenciones_cuota', 'movimientos', 'villa_historial', 'encargados', 'villas', 'propietarios'] as $tabla) {
+            DB::table($tabla)->delete();
+        }
+        DB::table('correlativos')->whereIn('tipo', ['CA', 'CR'])->update(['siguiente' => 1]);
+    }
+
+    /**
+     * Conceptos a crear si no existen: los del sistema y, de los propios de la importacion (Saldo
+     * inicial, Ajustes...), solo los que el plan usa, para no dejar conceptos de mas.
+     *
+     * @return array<string, bool> DESCR -> ES_CARGO
+     */
+    private function conceptosNecesarios(array $plan): array
+    {
+        $usados = [];
+        foreach ($plan['villas'] as $v) {
+            foreach ($v['movimientos'] as $m) {
+                $usados[$m['concepto']] = true;
+            }
+        }
+
+        return array_intersect_key(self::CONCEPTOS_IMPORTACION, $usados) + ['Cargo extraordinario' => true, 'Mora' => true, 'Abono / Pago' => false];
+    }
+
+    /** @return array<string, int> DESCR (o la marca de mantenimiento) -> NUM_CPTO */
+    private function asegurarConceptos(array $plan): array
+    {
+        foreach ($this->conceptosNecesarios($plan) as $descr => $esCargo) {
             Concepto::firstOrCreate(['DESCR' => $descr], [
                 'ES_CARGO' => $esCargo,
                 'ACTIVO' => ! array_key_exists($descr, self::CONCEPTOS_IMPORTACION),
@@ -489,6 +528,9 @@ class ImportadorEstadosCuenta
     private function textoBitacora(array $plan): string
     {
         $movs = array_sum(array_map(fn ($v) => count($v['movimientos']), $plan['villas']));
+        if (isset($plan['bitacora'])) {
+            return mb_substr(sprintf($plan['bitacora'], count($plan['villas']), count($plan['propietarios']), $movs), 0, 255);
+        }
 
         return mb_substr('Importó del Excel de estados de cuenta '.count($plan['villas']).' villas, '
             .count($plan['propietarios']).' propietarios y '.$movs.' movimientos (saldo inicial al '
@@ -528,7 +570,7 @@ class ImportadorEstadosCuenta
         $s[] = "DO \$\$ BEGIN IF to_regclass('correlativos') IS NOT NULL THEN UPDATE correlativos SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); ELSE UPDATE folio_counters SET siguiente = 1 WHERE tipo IN ('CA', 'CR'); END IF; END \$\$;";
         $s[] = '';
         $s[] = '-- conceptos que usa la importacion (inactivos si son propios de la importacion)';
-        foreach (self::CONCEPTOS_IMPORTACION + ['Cargo extraordinario' => true, 'Mora' => true, 'Abono / Pago' => false] as $descr => $esCargo) {
+        foreach ($this->conceptosNecesarios($plan) as $descr => $esCargo) {
             $activo = array_key_exists($descr, self::CONCEPTOS_IMPORTACION) ? 'false' : 'true';
             $s[] = "INSERT INTO conceptos (\"DESCR\", \"ES_CARGO\", \"ACTIVO\", \"ES_MANTENIMIENTO\") SELECT {$q($descr)}, ".($esCargo ? 'true' : 'false').", {$activo}, false WHERE NOT EXISTS (SELECT 1 FROM conceptos WHERE \"DESCR\" = {$q($descr)});";
         }
