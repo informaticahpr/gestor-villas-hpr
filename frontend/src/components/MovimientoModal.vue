@@ -43,7 +43,7 @@ const form = reactive({
 
 // --- modo "todas" (cuota mensual) ---
 const villasConAplicobro = computed(() => villas.value.filter((v) => v.aplicobro))
-// alquiladas a España: no pagan la cuota de mantenimiento (los demas cargos a todas si)
+// alquiladas a producción: no pagan la cuota de mantenimiento (los demas cargos a todas si)
 const villasAlquiladasEnTodas = computed(() =>
   conceptoSeleccionado.value?.ES_MANTENIMIENTO ? villasConAplicobro.value.filter((v) => v.alquilada) : [],
 )
@@ -178,7 +178,7 @@ async function guardar() {
         ? ` (${data.villas_con_cuota_especial} con cuota especial, a su monto asignado)`
         : ''
       const detalleExentas = data.villas_exentas.length > 0
-        ? ` Exentas por alquiler de España: ${data.villas_exentas.join(', ')}.`
+        ? ` Exentas por alquiler a producción: ${data.villas_exentas.join(', ')}.`
         : ''
       toast.success(`Cargo aplicado a ${data.villas_afectadas} villa(s)${detalleCuotaEspecial}.${detalleExentas}`)
     } else {
@@ -335,10 +335,10 @@ useEscapeKey(() => emit('close'))
             </div>
             <div v-if="villasAlquiladasEnTodas.length > 0" class="rounded-lg border border-gold-300/40 bg-cream-100 px-3 py-2.5 text-sm text-espresso-700/80">
               <strong>{{ villasAlquiladasEnTodas.length }}</strong>
-              {{ villasAlquiladasEnTodas.length === 1 ? 'villa alquilada' : 'villas alquiladas' }} a España no pagarán la cuota
-              (quedará "Exenta por alquiler de España" en su estado de cuenta):
+              {{ villasAlquiladasEnTodas.length === 1 ? 'villa alquilada' : 'villas alquiladas' }} a producción no pagarán la cuota
+              (quedará "Exenta por alquiler a producción" en su estado de cuenta):
               <strong>{{ villasAlquiladasEnTodas.map((v) => v.villa).join(', ') }}</strong>.
-              Se marcan en Configuración → Villas alquiladas.
+              Se marcan en Configuración → Villas alquiladas a producción.
             </div>
             <div v-if="villasConCuotaEspecialEnTodas.length > 0" class="rounded-lg border border-gold-300/40 bg-cream-100 px-3 py-2.5 text-sm text-espresso-700/80">
               <strong>{{ villasConCuotaEspecialEnTodas.length }}</strong> de ellas

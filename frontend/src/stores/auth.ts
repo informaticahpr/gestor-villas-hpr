@@ -26,7 +26,7 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.rol === 'Supervisor'
   }
 
-  /** Configuración completa: Director y Admin. El Supervisor solo ve "Villas alquiladas". */
+  /** Configuración completa: Director y Admin. El Supervisor solo ve "Villas alquiladas a producción". */
   function puedeVerConfiguracion(): boolean {
     return esDirectorOAdmin() || esSupervisor()
   }

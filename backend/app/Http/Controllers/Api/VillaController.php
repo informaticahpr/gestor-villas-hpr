@@ -266,7 +266,7 @@ class VillaController extends Controller
     }
 
     /**
-     * Configuracion -> Villas alquiladas: marca o desmarca la villa como alquilada a España. Mientras
+     * Configuracion -> Villas alquiladas: marca o desmarca la villa como alquilada a producción. Mientras
      * este marcada, la cuota de mantenimiento que se aplica a todas no se le cobra (queda exenta).
      * Lo pueden hacer el Supervisor, el Director y el Administrador.
      */
@@ -281,8 +281,8 @@ class VillaController extends Controller
                 'villa_alquilada',
                 $data['ALQUILADA'] ? 'activar' : 'desactivar',
                 $data['ALQUILADA']
-                    ? "Marcó la villa {$villa->CLV_CLIE} como alquilada a España (exenta de la cuota de mantenimiento)."
-                    : "Desmarcó la villa {$villa->CLV_CLIE} como alquilada a España (vuelve a pagar la cuota de mantenimiento).",
+                    ? "Marcó la villa {$villa->CLV_CLIE} como alquilada a producción (exenta de la cuota de mantenimiento)."
+                    : "Desmarcó la villa {$villa->CLV_CLIE} como alquilada a producción (vuelve a pagar la cuota de mantenimiento).",
             );
         }
 

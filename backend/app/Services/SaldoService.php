@@ -89,7 +89,7 @@ class SaldoService
             ->orderBy('ID_MOV')
             ->get();
 
-        // meses en que no se le cobro la cuota por estar alquilada a España: lineas informativas, sin
+        // meses en que no se le cobro la cuota por estar alquilada a producción: lineas informativas, sin
         // monto (no cambian el saldo), despues de los movimientos de ese mismo dia
         $exenciones = ExencionCuota::where('CLV_CLIE', $villa->CLV_CLIE)
             ->whereDate('FECHA', '>=', $desde->toDateString())

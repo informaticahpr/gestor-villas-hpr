@@ -3,7 +3,7 @@ export interface VillaResumen {
   nombre_completo: string
   saldo: number
   aplicobro: boolean
-  /** Alquilada a España: exenta de la cuota de mantenimiento (Configuración → Villas alquiladas) */
+  /** Alquilada a producción: exenta de la cuota de mantenimiento (Configuración → Villas alquiladas a producción) */
   alquilada: boolean
   cuota_especial: boolean
   monto_cuota_especial: number | null
@@ -87,7 +87,7 @@ export interface MovimientoFila {
   /** null en las lineas de exencion (no son movimientos) */
   id: number | null
   correlativo: string | null
-  /** 'exencion': mes sin cuota por alquiler de España (sin monto, no cambia el saldo) */
+  /** 'exencion': mes sin cuota por alquiler a producción (sin monto, no cambia el saldo) */
   tipo: 'cargo' | 'credito' | 'exencion'
   fecha: string
   descripcion: string

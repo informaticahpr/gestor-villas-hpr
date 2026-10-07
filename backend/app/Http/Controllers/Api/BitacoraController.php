@@ -27,7 +27,7 @@ class BitacoraController extends Controller
         'forma_pago' => 'Formas de pago',
         'cuota_especial' => 'Cuotas especiales',
         'cuota_mantenimiento' => 'Cuota de mantenimiento',
-        'villa_alquilada' => 'Villas alquiladas',
+        'villa_alquilada' => 'Villas alquiladas a producción',
         'sesion' => 'Sesiones',
         'movimiento' => 'Cargos y abonos',
     ];

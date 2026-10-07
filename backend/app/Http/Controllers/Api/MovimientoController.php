@@ -200,7 +200,7 @@ class MovimientoController extends Controller
         $villas = Villa::where('APLICOBRO', true)->get();
         $villasConCuotaEspecial = 0;
 
-        // Villas alquiladas a España (Configuracion -> Villas alquiladas): no se les cobra la cuota de
+        // Villas alquiladas a producción (Configuracion -> Villas alquiladas): no se les cobra la cuota de
         // mantenimiento; queda la exencion del mes, que se ve en su estado de cuenta. Los demas cargos
         // aplicados a todas (no de mantenimiento) si se les cobran.
         $exentas = collect();
@@ -209,7 +209,7 @@ class MovimientoController extends Controller
             foreach ($exentas as $villa) {
                 ExencionCuota::firstOrCreate(
                     ['CLV_CLIE' => $villa->CLV_CLIE, 'ANIO' => $fecha->year, 'MES' => $fecha->month],
-                    ['FECHA' => $fecha->toDateString(), 'MOTIVO' => ExencionCuota::MOTIVO_ALQUILER_ESPANA, 'USUARIO_ID' => $request->user()->id],
+                    ['FECHA' => $fecha->toDateString(), 'MOTIVO' => ExencionCuota::MOTIVO_ALQUILER_PRODUCCION, 'USUARIO_ID' => $request->user()->id],
                 );
             }
             if ($exentas->isNotEmpty()) {
@@ -217,7 +217,7 @@ class MovimientoController extends Controller
                     'villa_alquilada',
                     'crear',
                     'Cuota de mantenimiento de '.$fecha->locale('es')->translatedFormat('F Y').' no cobrada a '.$exentas->count()
-                        .' villa(s) alquilada(s) a España: '.Villa::enOrdenNatural($exentas)->pluck('CLV_CLIE')->join(', ').'.',
+                        .' villa(s) alquilada(s) a producción: '.Villa::enOrdenNatural($exentas)->pluck('CLV_CLIE')->join(', ').'.',
                 );
             }
         }

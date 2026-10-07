@@ -266,7 +266,7 @@ const acciones = [
           </svg>
         </span>
         <p class="font-display text-sm font-semibold text-espresso-800">Configuración</p>
-        <p class="mt-1 text-xs text-espresso-800/55">{{ auth.esSupervisor() ? 'Villas alquiladas a España' : 'Usuarios y roles del sistema' }}</p>
+        <p class="mt-1 text-xs text-espresso-800/55">{{ auth.esSupervisor() ? 'Villas alquiladas a producción' : 'Usuarios y roles del sistema' }}</p>
       </RouterLink>
     </div>
   </div>

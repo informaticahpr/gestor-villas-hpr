@@ -29,7 +29,7 @@ const auth = useAuthStore()
 const toast = useToastStore()
 const dialog = useDialogStore()
 
-// el Supervisor solo ve (y entra directo a) "Villas alquiladas"
+// el Supervisor solo ve (y entra directo a) "Villas alquiladas a producción"
 const tab = ref<'usuarios' | 'conceptos' | 'cuotas' | 'alquiladas' | 'formas-pago' | 'bitacora'>(auth.esSupervisor() ? 'alquiladas' : 'usuarios')
 
 // --- iconos (outline, mismo estilo que ToastContainer.vue) ---
@@ -297,7 +297,7 @@ async function eliminarConcepto(c: Concepto) {
   }
 }
 
-// --- Villas alquiladas a España: no pagan la cuota de mantenimiento mientras esten marcadas ---
+// --- Villas alquiladas a producción: no pagan la cuota de mantenimiento mientras esten marcadas ---
 const villasTodas = ref<VillaResumen[]>([])
 const cargandoAlquiladas = ref(false)
 const guardandoAlquilada = ref<string | null>(null)
@@ -348,7 +348,7 @@ async function cambiarAlquilada(v: VillaResumen, alquilada: boolean) {
   try {
     await api.patch(`/api/villas/${v.villa}/alquilada`, { ALQUILADA: alquilada })
     v.alquilada = alquilada
-    toast.success(alquilada ? `Villa ${v.villa} marcada como alquilada a España.` : `Villa ${v.villa} vuelve a pagar la cuota de mantenimiento.`)
+    toast.success(alquilada ? `Villa ${v.villa} marcada como alquilada a producción.` : `Villa ${v.villa} vuelve a pagar la cuota de mantenimiento.`)
   } catch (e: any) {
     toast.error(mensajeDeError(e, 'No se pudo guardar el cambio.'))
   } finally {
@@ -356,7 +356,7 @@ async function cambiarAlquilada(v: VillaResumen, alquilada: boolean) {
   }
 }
 
-// cuando España se va: desmarca todas de una vez
+// cuando la producción se va: desmarca todas de una vez
 async function desmarcarTodasAlquiladas() {
   const marcadas = villasTodas.value.filter((v) => v.alquilada)
   if (marcadas.length === 0) return
@@ -599,7 +599,7 @@ const ENTIDADES: Array<{ value: EntidadBitacora; label: string }> = [
   { value: 'cuota_especial', label: 'Cuotas especiales' },
   { value: 'cuota_mantenimiento', label: 'Cuota de mantenimiento' },
   { value: 'movimiento', label: 'Cargos y abonos' },
-  { value: 'villa_alquilada', label: 'Villas alquiladas' },
+  { value: 'villa_alquilada', label: 'Villas alquiladas a producción' },
   { value: 'sesion', label: 'Sesiones' },
 ]
 
@@ -753,7 +753,7 @@ onMounted(() => {
         :class="tab === 'alquiladas' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
         @click="tab = 'alquiladas'"
       >
-        Villas alquiladas
+        Villas alquiladas a producción
       </button>
       <template v-if="auth.esDirectorOAdmin()">
       <button
@@ -1215,13 +1215,13 @@ onMounted(() => {
       </div>
     </section>
 
-    <!-- Villas alquiladas a España -->
+    <!-- Villas alquiladas a producción -->
     <section v-if="tab === 'alquiladas'">
-      <p class="mb-1 font-display text-lg font-semibold text-espresso-800">Villas alquiladas</p>
+      <p class="mb-1 font-display text-lg font-semibold text-espresso-800">Villas alquiladas a producción</p>
       <p class="mb-4 text-sm text-espresso-800/60">
-        Marca las villas alquiladas a la producción de España. Mientras estén marcadas, al aplicar la cuota de
-        mantenimiento a todas no se les cobra y en su estado de cuenta aparece "Exenta por alquiler de España".
-        Cuando España se vaya, desmárcalas para que vuelvan a pagar.
+        Marca las villas alquiladas a una producción (de cualquier país). Mientras estén marcadas, al aplicar la cuota de
+        mantenimiento a todas no se les cobra y en su estado de cuenta aparece "Exenta por alquiler a producción".
+        Cuando la producción se vaya, desmárcalas para que vuelvan a pagar.
       </p>
 
       <div class="mb-3 flex flex-wrap items-center gap-3">
@@ -1263,7 +1263,7 @@ onMounted(() => {
             <tr>
               <th class="w-24 px-4 py-2.5 text-left font-medium text-espresso-800/70">Villa</th>
               <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Propietario</th>
-              <th class="w-48 px-4 py-2.5 text-center font-medium text-espresso-800/70">Alquilada a España</th>
+              <th class="w-48 px-4 py-2.5 text-center font-medium text-espresso-800/70">Alquilada a producción</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gold-300/15">
@@ -1281,7 +1281,7 @@ onMounted(() => {
                   type="checkbox"
                   :checked="v.alquilada"
                   :disabled="guardandoAlquilada !== null"
-                  :aria-label="`Villa ${v.villa} alquilada a España`"
+                  :aria-label="`Villa ${v.villa} alquilada a producción`"
                   class="h-4 w-4 cursor-pointer accent-brand-600"
                   @click.stop
                   @change="cambiarAlquilada(v, ($event.target as HTMLInputElement).checked)"
