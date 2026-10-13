@@ -21,21 +21,20 @@ interface Dashboard {
   fecha: string
   villas: number
   cuota_mantenimiento: number | null
-  /** No le llega al Consultor */
+  /** Con el permiso inicio.cobranza */
   cuentas_por_cobrar?: number
-  /** Solo Director/Admin */
+  /** Con el permiso inicio.completo */
   saldo_a_favor?: number
-  /** No le llega al Consultor */
+  /** Con el permiso inicio.cobranza */
   mes?: Periodo
-  /** Solo Director/Admin */
+  /** Con el permiso inicio.completo */
   anio?: Periodo & { anio: number; meses: (Periodo & { mes: number })[] }
 }
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
-// Todos ven el dashboard; al Supervisor el backend solo le manda villas, cuota, cuentas por cobrar y
-// lo recuperado en el mes (saldo a favor y el año son de Director/Admin); al Consultor, solo villas y cuota.
+// Todos ven el dashboard; el backend solo manda los indicadores que permiten los permisos del cargo.
 const dashboard = ref<Dashboard | null>(null)
 const errorDashboard = ref(false)
 
@@ -94,19 +93,19 @@ const todasLasAcciones = [
     titulo: 'Crear Villa',
     descripcion: 'Registrar una nueva villa',
     accion: () => (ui.mostrarCrearVilla = true),
-    soloOperar: true,
+    permiso: 'villas.crear' as const,
     icon: 'M12 4a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H5a1 1 0 110-2h6V5a1 1 0 011-1z',
   },
   {
     titulo: 'Cargo/Crédito',
     descripcion: 'Aplicar un cargo o abono',
     accion: () => (ui.mostrarMovimiento = true),
-    soloOperar: true,
+    permiso: 'movimientos.aplicar' as const,
     icon: 'M7 8a3 3 0 013-3h7a1 1 0 010 2h-7a1 1 0 000 2h4a3 3 0 010 6h-1a1 1 0 110-2h1a1 1 0 000-2h-4a3 3 0 01-3-3zm0 9a1 1 0 011-1h9a1 1 0 110 2H8a1 1 0 01-1-1z',
   },
   {
     titulo: 'Reportes',
-    descripcion: auth.esConsultor() ? 'Estados de cuenta por villa' : 'Estados de cuenta y saldos generales',
+    descripcion: !auth.puede('reportes.generales') ? 'Estados de cuenta por villa' : 'Estados de cuenta y saldos generales',
     accion: () => router.push({ name: 'reportes' }),
     icon: 'M4 20V10a1 1 0 112 0v10a1 1 0 11-2 0zm7 0V4a1 1 0 112 0v16a1 1 0 11-2 0zm7 0v-7a1 1 0 112 0v7a1 1 0 11-2 0z',
   },
@@ -120,8 +119,8 @@ const todasLasAcciones = [
   },
 ]
 
-// el Consultor es solo lectura: sin Crear Villa ni Cargo/Crédito
-const acciones = computed(() => todasLasAcciones.filter((a) => !(a.soloOperar && auth.esConsultor())))
+// Crear Villa y Cargo/Crédito solo con su permiso
+const acciones = computed(() => todasLasAcciones.filter((a) => !a.permiso || auth.puede(a.permiso)))
 </script>
 
 <template>
@@ -149,7 +148,7 @@ const acciones = computed(() => todasLasAcciones.filter((a) => !(a.soloOperar &&
 
       <template v-else>
         <!-- Indicadores -->
-        <div class="grid grid-cols-2 gap-4" :class="dashboard.saldo_a_favor !== undefined ? 'lg:grid-cols-4' : dashboard.cuentas_por_cobrar !== undefined ? 'lg:grid-cols-3' : ''">
+        <div class="grid grid-cols-2 gap-4" :class="{ 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4' }[2 + Number(dashboard.cuentas_por_cobrar !== undefined) + Number(dashboard.saldo_a_favor !== undefined)]">
           <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-4 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Villas registradas</p>
             <p class="mt-2 font-display text-2xl font-semibold text-espresso-800 tabular-nums">{{ dashboard.villas }}</p>
@@ -174,8 +173,8 @@ const acciones = computed(() => todasLasAcciones.filter((a) => !(a.soloOperar &&
         </div>
 
         <!-- Recuperado: mes y año -->
-        <div v-if="dashboard.mes" class="mt-4 grid grid-cols-1 gap-4" :class="dashboard.anio ? 'lg:grid-cols-3' : ''">
-          <div class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm">
+        <div v-if="dashboard.mes || dashboard.anio" class="mt-4 grid grid-cols-1 gap-4" :class="dashboard.mes && dashboard.anio ? 'lg:grid-cols-3' : ''">
+          <div v-if="dashboard.mes" class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm">
             <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Recuperado en {{ nombreMes }}</p>
             <p class="mt-2 font-display text-3xl font-semibold text-espresso-800 tabular-nums">{{ formatearMonto(dashboard.mes.recuperado) }}</p>
             <p class="mt-1 text-sm text-espresso-800/55">
@@ -187,7 +186,7 @@ const acciones = computed(() => todasLasAcciones.filter((a) => !(a.soloOperar &&
             <p class="mt-2 text-sm font-semibold text-espresso-800 tabular-nums">{{ porcentaje(dashboard.mes) }}% recuperado</p>
           </div>
 
-          <div v-if="dashboard.anio" class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm lg:col-span-2">
+          <div v-if="dashboard.anio" class="rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm" :class="dashboard.mes ? 'lg:col-span-2' : ''">
             <div class="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p class="text-xs font-medium uppercase tracking-wide text-espresso-800/50">Recuperado en {{ dashboard.anio.anio }}</p>
@@ -273,7 +272,7 @@ const acciones = computed(() => todasLasAcciones.filter((a) => !(a.soloOperar &&
           </svg>
         </span>
         <p class="font-display text-sm font-semibold text-espresso-800">Configuración</p>
-        <p class="mt-1 text-xs text-espresso-800/55">{{ auth.esSupervisor() ? 'Villas alquiladas a producción' : 'Usuarios y roles del sistema' }}</p>
+        <p class="mt-1 text-xs text-espresso-800/55">{{ auth.puede('usuarios.ver') || auth.puede('usuarios.gestionar') ? 'Usuarios, permisos y catálogos' : 'Ajustes del sistema' }}</p>
       </RouterLink>
     </div>
   </div>

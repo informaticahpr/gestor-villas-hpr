@@ -86,6 +86,8 @@ class AuthController extends Controller
             'usuario' => $user->usuario,
             'email' => $user->email,
             'rol' => $user->role?->nombre,
+            // lo que la pantalla muestra u oculta; el servidor igual revisa cada accion
+            'permisos' => $user->permisos(),
         ];
     }
 }

@@ -14,9 +14,8 @@ use Illuminate\Support\Arr;
 
 /**
  * Indicadores del inicio: villas registradas, cuota de mantenimiento, cuentas por cobrar y saldo a
- * favor a la fecha, y lo recuperado en el mes y en el año. El Supervisor solo recibe villas, cuota,
- * cuentas por cobrar y lo recuperado en el mes; el resto es para Director/Admin. El Consultor solo
- * recibe villas y cuota.
+ * favor a la fecha, y lo recuperado en el mes y en el año. Villas y cuota las ven todos; cuentas por
+ * cobrar y lo del mes, con el permiso inicio.cobranza; saldo a favor y el año, con inicio.completo.
  *
  * "Recuperado" = creditos/abonos aplicados en el periodo, comparados contra los cargos (cuentas
  * por cobrar) generados en ese mismo periodo. Puede pasar del 100% cuando se cobra deuda de
@@ -73,15 +72,12 @@ class DashboardController extends Controller
             ],
         ];
 
-        $rol = $request->user()?->role?->nombre;
+        $user = $request->user();
 
-        // el Consultor solo ve las villas registradas y la cuota de mantenimiento
-        if ($rol === Role::CONSULTOR) {
-            return response()->json(Arr::only($datos, ['fecha', 'villas', 'cuota_mantenimiento']));
+        if (! $user->tienePermiso('inicio.cobranza')) {
+            unset($datos['cuentas_por_cobrar'], $datos['mes']);
         }
-
-        // el Supervisor no ve el saldo a favor ni lo recuperado en el año
-        if (! in_array($rol, [Role::DIRECTOR, Role::ADMIN], true)) {
+        if (! $user->tienePermiso('inicio.completo')) {
             unset($datos['saldo_a_favor'], $datos['anio']);
         }
 

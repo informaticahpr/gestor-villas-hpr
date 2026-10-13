@@ -22,6 +22,7 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $data = $this->validar($request);
+        $this->protegerAdministradores($request, rolNuevo: $data['rol']);
 
         $user = User::create([
             'name' => $data['name'],
@@ -41,6 +42,7 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $data = $this->validar($request, $user);
+        $this->protegerAdministradores($request, $user, $data['rol']);
 
         $user->update([
             'name' => $data['name'],
@@ -95,6 +97,8 @@ class UserController extends Controller
 
     public function cambiarPassword(Request $request, User $user)
     {
+        $this->protegerAdministradores($request, $user);
+
         $data = $request->validate([
             'password' => ['required', 'string', 'min:8'],
         ], [
@@ -113,6 +117,8 @@ class UserController extends Controller
 
     public function activar(Request $request, User $user)
     {
+        $this->protegerAdministradores($request, $user);
+
         $data = $request->validate([
             'activo' => ['required', 'boolean'],
         ]);
@@ -138,6 +144,8 @@ class UserController extends Controller
      */
     public function destroy(Request $request, User $user)
     {
+        $this->protegerAdministradores($request, $user);
+
         if ($user->activo) {
             return response()->json([
                 'message' => 'Solo se pueden eliminar usuarios deshabilitados. Deshabilítalo primero.',
@@ -156,6 +164,21 @@ class UserController extends Controller
         Bitacora::registrar('usuario', 'eliminar', "Eliminó al usuario \"{$nombre}\".");
 
         return response()->json(status: 204);
+    }
+
+    /**
+     * Otro cargo puede tener "Gestionar usuarios" (Configuracion -> Permisos), pero solo el Administrador
+     * toca cuentas de Administrador o da ese cargo: si no, cualquiera con el permiso se haria Administrador.
+     */
+    private function protegerAdministradores(Request $request, ?User $user = null, ?string $rolNuevo = null): void
+    {
+        if ($request->user()->esAdmin()) {
+            return;
+        }
+
+        if ($user?->esAdmin() || $rolNuevo === Role::ADMIN) {
+            abort(403, 'Solo un Administrador puede modificar cuentas de Administrador o asignar ese cargo.');
+        }
     }
 
     /**

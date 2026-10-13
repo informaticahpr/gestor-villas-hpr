@@ -242,7 +242,7 @@ useEscapeKey(() => emit('close'))
           <div class="mb-1.5 flex items-center justify-between">
             <label class="block text-sm font-medium text-espresso-700">Concepto</label>
             <button
-              v-if="auth.esDirectorOAdmin()"
+              v-if="auth.puede('config.conceptos')"
               type="button"
               class="text-xs font-medium text-brand-700 hover:text-brand-800"
               @click="mostrarNuevoConcepto = !mostrarNuevoConcepto"
@@ -251,7 +251,7 @@ useEscapeKey(() => emit('close'))
             </button>
           </div>
 
-          <div v-if="mostrarNuevoConcepto && auth.esDirectorOAdmin()" class="mb-2 flex gap-2 rounded-lg border border-gold-300/40 bg-brand-50/40 p-2">
+          <div v-if="mostrarNuevoConcepto && auth.puede('config.conceptos')" class="mb-2 flex gap-2 rounded-lg border border-gold-300/40 bg-brand-50/40 p-2">
             <input
               v-model="nuevoConceptoDescr"
               type="text"

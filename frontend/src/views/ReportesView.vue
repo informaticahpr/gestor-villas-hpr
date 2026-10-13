@@ -19,8 +19,8 @@ const dataStore = useDataStore()
 const toast = useToastStore()
 
 const tab = ref<'estado' | 'general' | 'antiguedad' | 'concepto'>('estado')
-// el Consultor solo ve el estado de cuenta por villa (los demas reportes le dan 403)
-const soloEstadoCuenta = auth.esConsultor()
+// sin el permiso de reportes generales solo ve el estado de cuenta por villa (los demas le dan 403)
+const soloEstadoCuenta = !auth.puede('reportes.generales')
 
 // fechas por defecto en la zona de la app (Tegucigalpa), no en UTC
 function hoy(): string {
@@ -299,7 +299,7 @@ watch(() => dataStore.version, () => {
           </div>
           <div class="w-full max-w-sm">
             <label class="mb-1 block text-sm font-medium text-espresso-700">Villa</label>
-            <VillaBuscador v-model="villaConcepto" con-opcion-todas />
+            <VillaBuscador v-model="villaConcepto" con-opcion-todas enviar-con-enter />
           </div>
         </div>
         <div class="flex flex-wrap items-end gap-3">
@@ -374,7 +374,7 @@ watch(() => dataStore.version, () => {
       <form class="mb-6 space-y-3" @submit.prevent="generarEstadoCuenta">
         <div class="max-w-sm">
           <label class="mb-1 block text-sm font-medium text-espresso-700">Villa</label>
-          <VillaBuscador v-model="villaFiltro" con-opcion-todas />
+          <VillaBuscador v-model="villaFiltro" con-opcion-todas enviar-con-enter />
         </div>
         <div class="flex flex-wrap items-end gap-3">
           <div>

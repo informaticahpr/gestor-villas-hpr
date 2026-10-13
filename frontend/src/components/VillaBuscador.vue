@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import api from '../lib/api'
 import { formatearMonto } from '../lib/format'
 import type { VillaResumen } from '../types'
@@ -8,10 +8,13 @@ const props = withDefaults(
   defineProps<{
     conOpcionTodas?: boolean
     placeholder?: string
+    /** Al elegir la villa con Enter, envia el formulario que la contiene (Buscar / Generar). */
+    enviarConEnter?: boolean
   }>(),
   {
     conOpcionTodas: false,
     placeholder: 'Buscar villa por # o propietario...',
+    enviarConEnter: false,
   },
 )
 
@@ -22,25 +25,86 @@ const modo = ref<'todas' | 'una'>(props.conOpcionTodas && !modelo.value ? 'todas
 const villaSeleccionada = ref<VillaResumen | null>(null)
 const busqueda = ref('')
 const resultados = ref<VillaResumen[]>([])
+/** Resultado resaltado con las flechas (Enter lo elige). */
+const resaltado = ref(-1)
+const sinResultados = ref(false)
 let temporizador: ReturnType<typeof setTimeout> | undefined
+// una respuesta vieja (de lo que se escribio antes) no pisa a la mas reciente
+let ultimaConsulta = 0
+
+async function consultar(texto: string): Promise<VillaResumen[] | null> {
+  const id = ++ultimaConsulta
+  const { data } = await api.get('/api/villas', { params: { q: texto } })
+  if (id !== ultimaConsulta) return null
+  resultados.value = data.data
+  resaltado.value = -1
+  sinResultados.value = data.data.length === 0
+  return data.data
+}
 
 function buscar() {
   clearTimeout(temporizador)
+  sinResultados.value = false
   if (!busqueda.value.trim()) {
+    ultimaConsulta++
     resultados.value = []
     return
   }
-  temporizador = setTimeout(async () => {
-    const { data } = await api.get('/api/villas', { params: { q: busqueda.value } })
-    resultados.value = data.data
-  }, 200)
+  temporizador = setTimeout(() => consultar(busqueda.value), 200)
 }
 
 function seleccionar(v: VillaResumen) {
+  ultimaConsulta++
+  clearTimeout(temporizador)
   villaSeleccionada.value = v
   modelo.value = v.villa
   busqueda.value = ''
   resultados.value = []
+  resaltado.value = -1
+  sinResultados.value = false
+}
+
+/** "z70", "Z70" y "Z-70" son la misma villa. */
+const normalizar = (texto: string) => texto.toUpperCase().replace(/[\s-]/g, '')
+
+/**
+ * Enter: elige la villa resaltada con las flechas; si no, la que coincide exacto con lo escrito
+ * (ej. "z70" -> Z-70) o la unica que aparece. Con varias posibles (ej. un apellido) se queda la
+ * lista para elegir. Con enviarConEnter, ademas envia el formulario (Buscar / Generar).
+ */
+async function alPresionarEnter(e: KeyboardEvent) {
+  // sin esto el Enter enviaria el formulario de afuera antes de elegir la villa
+  e.preventDefault()
+  const input = e.target as HTMLInputElement
+  const texto = busqueda.value.trim()
+  if (!texto) return
+
+  let elegida: VillaResumen | undefined = resultados.value[resaltado.value]
+  if (!elegida) {
+    clearTimeout(temporizador)
+    const lista = await consultar(texto)
+    if (!lista) return
+    elegida = lista.find((v) => normalizar(v.villa) === normalizar(texto)) ?? (lista.length === 1 ? lista[0] : undefined)
+  }
+  if (!elegida) return
+
+  seleccionar(elegida)
+  if (props.enviarConEnter) {
+    const form = input.form
+    await nextTick()
+    form?.requestSubmit()
+  }
+}
+
+function moverResaltado(paso: number) {
+  if (!resultados.value.length) return
+  const total = resultados.value.length
+  resaltado.value = (resaltado.value + paso + total) % total
+}
+
+function cerrarLista() {
+  resultados.value = []
+  resaltado.value = -1
 }
 
 function limpiar() {
@@ -102,16 +166,22 @@ onMounted(async () => {
           :placeholder="placeholder"
           class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2.5 text-sm placeholder:text-espresso-800/30 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
           @input="buscar"
+          @keydown.enter="alPresionarEnter"
+          @keydown.down.prevent="moverResaltado(1)"
+          @keydown.up.prevent="moverResaltado(-1)"
+          @keydown.esc="cerrarLista"
         />
+        <p v-if="sinResultados" class="mt-1 text-xs text-wine-600">No se encontró ninguna villa con "{{ busqueda.trim() }}".</p>
         <div
           v-if="resultados.length"
           class="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-gold-300/40 bg-white shadow-lg"
         >
           <button
-            v-for="v in resultados"
+            v-for="(v, i) in resultados"
             :key="v.villa"
             type="button"
             class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-brand-50"
+            :class="i === resaltado ? 'bg-brand-50' : ''"
             @click="seleccionar(v)"
           >
             <span class="font-medium text-espresso-800">{{ v.villa }} — {{ v.nombre_completo }}</span>

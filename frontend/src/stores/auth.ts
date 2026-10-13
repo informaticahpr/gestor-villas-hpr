@@ -2,11 +2,41 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import api, { fetchCsrfCookie } from '../lib/api'
 
+/** Claves de Configuración → Permisos (ver RolPermiso::CATALOGO en el backend). */
+export type Permiso =
+  | 'villas.crear'
+  | 'villas.editar'
+  | 'movimientos.aplicar'
+  | 'movimientos.anular'
+  | 'inicio.cobranza'
+  | 'inicio.completo'
+  | 'reportes.generales'
+  | 'config.conceptos'
+  | 'config.cuotas'
+  | 'config.alquiladas'
+  | 'config.formas_pago'
+  | 'config.bitacora'
+  | 'usuarios.ver'
+  | 'usuarios.gestionar'
+
+/** Pestañas de Configuración que dependen de un permiso (Permisos es solo del Administrador). */
+const PERMISOS_DE_CONFIGURACION: Permiso[] = [
+  'usuarios.ver',
+  'usuarios.gestionar',
+  'config.conceptos',
+  'config.cuotas',
+  'config.alquiladas',
+  'config.formas_pago',
+  'config.bitacora',
+]
+
 export interface AuthUser {
   id: number
   name: string
   email: string
   rol: string | null
+  /** Lo que su cargo puede hacer; el Administrador los trae todos. El servidor igual revisa cada acción. */
+  permisos: Permiso[]
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -14,26 +44,16 @@ export const useAuthStore = defineStore('auth', () => {
   const cargando = ref(false)
   const listo = ref(false)
 
-  function esDirectorOAdmin(): boolean {
-    return user.value?.rol === 'Director' || user.value?.rol === 'Admin'
-  }
-
   function esAdmin(): boolean {
     return user.value?.rol === 'Admin'
   }
 
-  function esSupervisor(): boolean {
-    return user.value?.rol === 'Supervisor'
+  function puede(permiso: Permiso): boolean {
+    return user.value?.permisos?.includes(permiso) ?? false
   }
 
-  /** Solo lectura: villas, estado de cuenta por villa y reimpresion. No crea, carga, anula ni cobra nada. */
-  function esConsultor(): boolean {
-    return user.value?.rol === 'Consultor'
-  }
-
-  /** Configuración completa: Director y Admin. El Supervisor solo ve "Villas alquiladas a producción". */
   function puedeVerConfiguracion(): boolean {
-    return esDirectorOAdmin() || esSupervisor()
+    return esAdmin() || PERMISOS_DE_CONFIGURACION.some(puede)
   }
 
   async function fetchUser(): Promise<void> {
@@ -63,5 +83,5 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, cargando, listo, esDirectorOAdmin, esAdmin, esSupervisor, esConsultor, puedeVerConfiguracion, fetchUser, login, logout }
+  return { user, cargando, listo, esAdmin, puede, puedeVerConfiguracion, fetchUser, login, logout }
 })

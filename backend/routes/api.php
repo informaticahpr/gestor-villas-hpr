@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FormaPagoController;
 use App\Http\Controllers\Api\HoyController;
 use App\Http\Controllers\Api\MovimientoController;
+use App\Http\Controllers\Api\PermisoController;
 use App\Http\Controllers\Api\PropietarioController;
 use App\Http\Controllers\Api\ReciboController;
 use App\Http\Controllers\Api\ReporteController;
@@ -18,13 +19,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-Route::middleware('auth:sanctum')->group(function () {
+// activo: si deshabilitan al usuario con la sesion abierta, se le cierra en su siguiente peticion
+Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'me']);
     Route::get('/hoy', HoyController::class);
-    // todos los roles; Supervisor y Consultor solo reciben los indicadores basicos (ver DashboardController)
+    // todos los cargos; los indicadores que recibe cada uno dependen de sus permisos (ver DashboardController)
     Route::get('/dashboard', DashboardController::class);
 
+    // --- solo lectura: todos los cargos ---
     Route::get('/villas', [VillaController::class, 'index']);
     Route::get('/villas/{villa}', [VillaController::class, 'show']);
 
@@ -41,12 +44,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reportes/estado-cuenta/exportar', [ReporteController::class, 'exportarEstadoCuentaXlsx']);
     Route::get('/reportes/estado-cuenta/pdf', [ReporteController::class, 'estadoCuentaPdf']);
 
-    // todos menos el Consultor (solo lectura: villas, estado de cuenta por villa y reimpresion)
-    Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN.','.Role::SUPERVISOR)->group(function () {
-        Route::post('/villas', [VillaController::class, 'store']);
-        Route::post('/movimientos', [MovimientoController::class, 'store']);
-        Route::post('/movimientos/aplicar-a-todas', [MovimientoController::class, 'aplicarATodas']);
+    // --- segun los permisos del cargo (Configuracion -> Permisos; el Administrador los tiene todos) ---
+    Route::post('/villas', [VillaController::class, 'store'])->middleware('permiso:villas.crear');
+    Route::put('/villas/{villa}', [VillaController::class, 'update'])->middleware('permiso:villas.editar');
 
+    Route::post('/movimientos', [MovimientoController::class, 'store'])->middleware('permiso:movimientos.aplicar');
+    Route::post('/movimientos/aplicar-a-todas', [MovimientoController::class, 'aplicarATodas'])->middleware('permiso:movimientos.aplicar');
+    Route::patch('/movimientos/{movimiento}/anular', [MovimientoController::class, 'anular'])->middleware('permiso:movimientos.anular');
+
+    Route::middleware('permiso:reportes.generales')->group(function () {
         Route::get('/reportes/saldos-generales', [ReporteController::class, 'saldosGenerales']);
         Route::get('/reportes/saldos-generales/exportar', [ReporteController::class, 'exportarSaldosXlsx']);
         Route::get('/reportes/saldos-generales/pdf', [ReporteController::class, 'saldosGeneralesPdf']);
@@ -58,42 +64,46 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reportes/por-concepto/pdf', [ReporteController::class, 'porConceptoPdf']);
     });
 
-    // Configuracion -> Villas alquiladas: tambien el Supervisor (es lo unico de Configuracion que ve)
-    Route::patch('/villas/{villa}/alquilada', [VillaController::class, 'actualizarAlquilada'])
-        ->middleware('role:'.Role::DIRECTOR.','.Role::ADMIN.','.Role::SUPERVISOR);
+    Route::patch('/villas/{villa}/alquilada', [VillaController::class, 'actualizarAlquilada'])->middleware('permiso:config.alquiladas');
 
-    Route::middleware('role:'.Role::DIRECTOR.','.Role::ADMIN)->group(function () {
-        Route::patch('/movimientos/{movimiento}/anular', [MovimientoController::class, 'anular']);
-
-        Route::put('/villas/{villa}', [VillaController::class, 'update']);
-        Route::patch('/villas/{villa}/cuota-especial', [VillaController::class, 'actualizarCuotaEspecial']);
+    Route::middleware('permiso:config.conceptos')->group(function () {
         Route::post('/conceptos', [ConceptoController::class, 'store']);
         Route::put('/conceptos/{concepto}', [ConceptoController::class, 'update']);
         Route::patch('/conceptos/{concepto}/activo', [ConceptoController::class, 'activar']);
         Route::delete('/conceptos/{concepto}', [ConceptoController::class, 'destroy']);
+    });
 
+    Route::middleware('permiso:config.cuotas')->group(function () {
+        Route::get('/cuota-mantenimiento', [CuotaMantenimientoController::class, 'show']);
+        Route::put('/cuota-mantenimiento', [CuotaMantenimientoController::class, 'update']);
+        Route::patch('/villas/{villa}/cuota-especial', [VillaController::class, 'actualizarCuotaEspecial']);
+    });
+
+    Route::middleware('permiso:config.formas_pago')->group(function () {
         Route::post('/formas-pago', [FormaPagoController::class, 'store']);
         Route::put('/formas-pago/{formaPago}', [FormaPagoController::class, 'update']);
         Route::patch('/formas-pago/{formaPago}/activo', [FormaPagoController::class, 'activar']);
         Route::delete('/formas-pago/{formaPago}', [FormaPagoController::class, 'destroy']);
-        // el Director puede ver la lista de usuarios, pero no modificarlos (ver mas abajo)
-        Route::get('/usuarios', [UserController::class, 'index']);
+    });
 
-        Route::get('/cuota-mantenimiento', [CuotaMantenimientoController::class, 'show']);
-        Route::put('/cuota-mantenimiento', [CuotaMantenimientoController::class, 'update']);
-
+    Route::middleware('permiso:config.bitacora')->group(function () {
         Route::get('/bitacora', [BitacoraController::class, 'index']);
         Route::get('/bitacora/exportar', [BitacoraController::class, 'exportarExcel']);
         Route::get('/bitacora/pdf', [BitacoraController::class, 'exportarPdf']);
     });
 
-    // Solo el Administrador gestiona usuarios: crear, editar, habilitar/deshabilitar, eliminar y
-    // cambiar contraseñas. El Director unicamente puede verlos (GET /usuarios).
-    Route::middleware('role:'.Role::ADMIN)->group(function () {
+    Route::get('/usuarios', [UserController::class, 'index'])->middleware('permiso:usuarios.ver,usuarios.gestionar');
+    Route::middleware('permiso:usuarios.gestionar')->group(function () {
         Route::post('/usuarios', [UserController::class, 'store']);
         Route::put('/usuarios/{user}', [UserController::class, 'update']);
         Route::patch('/usuarios/{user}/activo', [UserController::class, 'activar']);
         Route::delete('/usuarios/{user}', [UserController::class, 'destroy']);
         Route::patch('/usuarios/{user}/password', [UserController::class, 'cambiarPassword']);
+    });
+
+    // Permisos: solo el Administrador, y no es un permiso que se pueda dar (nadie mas se los sube solo)
+    Route::middleware('role:'.Role::ADMIN)->group(function () {
+        Route::get('/permisos', [PermisoController::class, 'index']);
+        Route::put('/permisos/{rol}', [PermisoController::class, 'update']);
     });
 });

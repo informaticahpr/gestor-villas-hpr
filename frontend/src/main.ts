@@ -24,7 +24,12 @@ api.interceptors.response.use(undefined, (error) => {
     if (!redirigiendo) {
       redirigiendo = true
       auth.user = null
-      useToastStore(pinia).warning('Tu sesión expiró. Vuelve a iniciar sesión para continuar.')
+      // cuenta deshabilitada mientras tenia la sesion abierta: el backend manda su propio mensaje
+      useToastStore(pinia).warning(
+        error.response.data?.cuenta_deshabilitada
+          ? error.response.data.message
+          : 'Tu sesión expiró. Vuelve a iniciar sesión para continuar.',
+      )
       const actual = router.currentRoute.value
       router.push({ name: 'login', query: actual.name === 'login' ? {} : { next: actual.fullPath } }).finally(() => {
         redirigiendo = false

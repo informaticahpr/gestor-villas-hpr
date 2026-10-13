@@ -142,7 +142,7 @@ const claseCampo =
     <p class="mb-1 font-display text-2xl font-semibold text-espresso-800">Reimpresión</p>
     <p class="mb-5 text-sm text-espresso-800/60">
       Notas de cargo y recibos de los movimientos aplicados (original y copia). Busca el movimiento y ábrelo para verlo o volver a imprimirlo.
-      <template v-if="auth.esDirectorOAdmin()">Si se capturó por error, anúlalo y vuelve a capturar el correcto.</template>
+      <template v-if="auth.puede('movimientos.anular')">Si se capturó por error, anúlalo y vuelve a capturar el correcto.</template>
     </p>
 
     <form
@@ -151,7 +151,7 @@ const claseCampo =
     >
       <div class="w-full max-w-sm">
         <label class="mb-1 block text-sm font-medium text-espresso-700">Villa</label>
-        <VillaBuscador v-model="filtroVilla" con-opcion-todas />
+        <VillaBuscador v-model="filtroVilla" con-opcion-todas enviar-con-enter />
       </div>
       <div>
         <label class="mb-1 block text-sm font-medium text-espresso-700">Tipo</label>
@@ -236,7 +236,7 @@ const claseCampo =
             <td class="px-4 py-2.5 text-espresso-800/70">{{ m.usuario }}</td>
             <td class="whitespace-nowrap px-4 py-2.5 text-right">
               <button
-                v-if="auth.esDirectorOAdmin() && !m.anulado"
+                v-if="auth.puede('movimientos.anular') && !m.anulado"
                 type="button"
                 class="mr-2 whitespace-nowrap rounded-lg border border-wine-500/30 px-3 py-1.5 text-sm font-medium text-wine-600 hover:bg-wine-500/5"
                 @click="pedirAnulacion(m)"

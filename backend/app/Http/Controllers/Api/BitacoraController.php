@@ -23,6 +23,7 @@ class BitacoraController extends Controller
 
     private const ENTIDADES = [
         'usuario' => 'Usuarios',
+        'permiso' => 'Permisos',
         'concepto' => 'Conceptos',
         'forma_pago' => 'Formas de pago',
         'cuota_especial' => 'Cuotas especiales',

@@ -37,4 +37,21 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class, 'rol_id');
     }
+
+    public function esAdmin(): bool
+    {
+        return $this->role?->nombre === Role::ADMIN;
+    }
+
+    /** Lo que su cargo puede hacer (Configuracion -> Permisos). El Administrador puede todo. */
+    public function tienePermiso(string $permiso): bool
+    {
+        return in_array($permiso, $this->permisos(), true);
+    }
+
+    /** @return list<string> */
+    public function permisos(): array
+    {
+        return $this->role?->clavesDePermisos() ?? [];
+    }
 }

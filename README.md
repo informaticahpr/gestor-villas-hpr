@@ -41,6 +41,13 @@ Supervisor puede aplicar cargos/abonos y ver reportes, pero no puede entrar a Co
 y cambiar contraseñas. El **Director** puede ver la lista (solo lectura); el resto de Configuración
 (conceptos, cuotas, formas de pago, bitácora) sí la gestiona.
 
+**Permisos:** lo anterior es lo que trae cada cargo por defecto. En **Configuración → Permisos** (solo el
+Administrador) se marca con checks qué puede hacer cada cargo: crear/editar villas, aplicar y anular
+movimientos, indicadores del inicio, reportes generales y cada pestaña de Configuración. El catálogo está
+en `RolPermiso::CATALOGO` y cada ruta lo revisa con el middleware `permiso:` (`routes/api.php`). El
+Administrador siempre tiene todos los permisos y no se le pueden quitar; solo él gestiona Permisos y solo
+él puede tocar cuentas de Administrador o dar ese cargo. Cada cambio queda en la bitácora.
+
 ### Cuota de mantenimiento y cuotas especiales
 
 - **Configuración → Cuotas** tiene dos submenús: *Cuota de mantenimiento* (el monto mensual, que solo

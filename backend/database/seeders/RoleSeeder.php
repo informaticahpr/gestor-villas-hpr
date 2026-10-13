@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
+use App\Models\RolPermiso;
 use Illuminate\Database\Seeder;
 
 class RoleSeeder extends Seeder
@@ -16,5 +17,8 @@ class RoleSeeder extends Seeder
             ['nombre' => Role::SUPERVISOR, 'descripcion' => 'Puede aplicar cargos, abonos y generar reportes'],
             ['nombre' => Role::CONSULTOR, 'descripcion' => 'Solo lectura: villas, estados de cuenta y reimpresión'],
         ], ['nombre'], ['descripcion']);
+
+        // en una base nueva los cargos aun no existian cuando corrio la migracion de permisos
+        RolPermiso::sembrarIniciales();
     }
 }

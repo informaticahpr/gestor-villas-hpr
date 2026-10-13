@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import api from '../lib/api'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore, type Permiso } from '../stores/auth'
 import { useToastStore } from '../stores/toast'
 import { useDialogStore } from '../stores/dialog'
 import { mensajeDeError } from '../lib/errors'
@@ -29,8 +29,24 @@ const auth = useAuthStore()
 const toast = useToastStore()
 const dialog = useDialogStore()
 
-// el Supervisor solo ve (y entra directo a) "Villas alquiladas a producción"
-const tab = ref<'usuarios' | 'conceptos' | 'cuotas' | 'alquiladas' | 'formas-pago' | 'bitacora'>(auth.esSupervisor() ? 'alquiladas' : 'usuarios')
+type Pestana = 'usuarios' | 'permisos' | 'conceptos' | 'cuotas' | 'alquiladas' | 'formas-pago' | 'bitacora'
+
+// cada cargo ve las pestañas que le dan sus permisos (Permisos es solo del Administrador)
+const pestanas = computed(() =>
+  (
+    [
+      { id: 'usuarios', titulo: 'Usuarios', visible: auth.puede('usuarios.ver') || auth.puede('usuarios.gestionar') },
+      { id: 'permisos', titulo: 'Permisos', visible: auth.esAdmin() },
+      { id: 'conceptos', titulo: 'Conceptos', visible: auth.puede('config.conceptos') },
+      { id: 'cuotas', titulo: 'Cuotas', visible: auth.puede('config.cuotas') },
+      { id: 'alquiladas', titulo: 'Villas Alquiladas', visible: auth.puede('config.alquiladas') },
+      { id: 'formas-pago', titulo: 'Formas de pago', visible: auth.puede('config.formas_pago') },
+      { id: 'bitacora', titulo: 'Bitácora', visible: auth.puede('config.bitacora') },
+    ] satisfies { id: Pestana; titulo: string; visible: boolean }[]
+  ).filter((p) => p.visible),
+)
+const tab = ref<Pestana>(pestanas.value[0]?.id ?? 'usuarios')
+const ve = (p: Pestana) => pestanas.value.some((x) => x.id === p)
 
 // --- iconos (outline, mismo estilo que ToastContainer.vue) ---
 const iconEditar = 'M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z'
@@ -44,6 +60,8 @@ const iconCancelar = 'M6 18L18 6M6 6l12 12'
 // --- Usuarios ---
 const usuarios = ref<Usuario[]>([])
 const roles = ref<string[]>([])
+// solo un Administrador da el cargo de Administrador (aunque otro cargo tenga "Gestionar usuarios")
+const rolesAsignables = computed(() => (auth.esAdmin() ? roles.value : roles.value.filter((r) => r !== 'Admin')))
 const cargandoUsuarios = ref(false)
 const guardandoUsuario = ref(false)
 const mostrarFormUsuario = ref(false)
@@ -75,7 +93,7 @@ async function cargarUsuarios() {
     const { data } = await api.get('/api/usuarios')
     usuarios.value = data.data
     roles.value = data.roles
-    formUsuario.rol = formUsuario.rol || roles.value[0] || ''
+    formUsuario.rol = formUsuario.rol || rolesAsignables.value[0] || ''
   } finally {
     cargandoUsuarios.value = false
   }
@@ -707,16 +725,82 @@ function exportarBitacora(formato: FormatoExportacion) {
   abrirReporte('bitacora', formato, filtrosAplicadosBitacora.value)
 }
 
+// --- Permisos (solo el Administrador) ---
+interface PermisoCatalogo {
+  clave: Permiso
+  grupo: string
+  etiqueta: string
+  descripcion: string
+}
+interface RolPermisos {
+  id: number
+  nombre: string
+  permisos: Permiso[]
+  /** false para el Administrador: siempre lo tiene todo */
+  editable: boolean
+}
+
+const catalogoPermisos = ref<PermisoCatalogo[]>([])
+const rolesPermisos = ref<RolPermisos[]>([])
+const cargandoPermisos = ref(false)
+const guardandoPermiso = ref<string | null>(null)
+
+/** Catalogo agrupado (Villas, Cargos y créditos, ...) en el orden del servidor. */
+const gruposPermisos = computed(() => {
+  const grupos: { grupo: string; permisos: PermisoCatalogo[] }[] = []
+  for (const p of catalogoPermisos.value) {
+    const ultimo = grupos[grupos.length - 1]
+    if (ultimo?.grupo === p.grupo) ultimo.permisos.push(p)
+    else grupos.push({ grupo: p.grupo, permisos: [p] })
+  }
+  return grupos
+})
+
+async function cargarPermisos() {
+  cargandoPermisos.value = true
+  try {
+    const { data } = await api.get('/api/permisos')
+    catalogoPermisos.value = data.catalogo
+    rolesPermisos.value = data.roles
+  } catch (e) {
+    toast.error(mensajeDeError(e, 'No se pudieron cargar los permisos.'))
+  } finally {
+    cargandoPermisos.value = false
+  }
+}
+
+/** Se guarda en cuanto se marca o desmarca (como Villas Alquiladas). */
+async function cambiarPermiso(rol: RolPermisos, permiso: Permiso, marcado: boolean) {
+  if (!rol.editable || guardandoPermiso.value) return
+  const antes = rol.permisos
+  const despues = marcado ? [...antes, permiso] : antes.filter((p) => p !== permiso)
+  guardandoPermiso.value = `${rol.id}:${permiso}`
+  rol.permisos = despues
+  try {
+    const { data } = await api.put(`/api/permisos/${rol.id}`, { permisos: despues })
+    rol.permisos = data.permisos
+    const etiqueta = catalogoPermisos.value.find((p) => p.clave === permiso)?.etiqueta ?? permiso
+    toast.success(`${rol.nombre}: ${marcado ? 'ahora puede' : 'ya no puede'} "${etiqueta}".`)
+  } catch (e) {
+    rol.permisos = antes
+    toast.error(mensajeDeError(e, 'No se pudieron guardar los permisos.'))
+  } finally {
+    guardandoPermiso.value = null
+  }
+}
+
 onMounted(() => {
-  cargarVillasAlquiladas()
-  // el resto de Configuracion es solo del Director y el Administrador
-  if (!auth.esDirectorOAdmin()) return
-  cargarUsuarios()
-  cargarConceptos()
-  cargarCuotaMantenimiento()
-  cargarCuotasEspeciales()
-  cargarFormasPago()
-  cargarBitacora()
+  // solo lo de las pestañas que ve (lo demas le daria 403)
+  if (ve('usuarios')) cargarUsuarios()
+  if (ve('permisos')) cargarPermisos()
+  if (ve('conceptos')) cargarConceptos()
+  if (ve('cuotas')) {
+    cargarCuotaMantenimiento()
+    cargarCuotasEspeciales()
+  }
+  if (ve('alquiladas')) cargarVillasAlquiladas()
+  if (ve('formas-pago')) cargarFormasPago()
+  if (ve('bitacora')) cargarBitacora()
 })
 </script>
 
@@ -725,72 +809,35 @@ onMounted(() => {
     <p class="mb-4 font-display text-2xl font-semibold text-espresso-800">Configuración</p>
 
     <div class="mb-6 flex flex-wrap gap-4 border-b border-gold-300/30 text-sm">
-      <template v-if="auth.esDirectorOAdmin()">
       <button
+        v-for="p in pestanas"
+        :key="p.id"
         class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'usuarios' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'usuarios'"
+        :class="tab === p.id ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
+        @click="tab = p.id"
       >
-        Usuarios
+        {{ p.titulo }}
       </button>
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'conceptos' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'conceptos'"
-      >
-        Conceptos
-      </button>
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'cuotas' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'cuotas'"
-      >
-        Cuotas
-      </button>
-      </template>
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'alquiladas' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'alquiladas'"
-      >
-        Villas Alquiladas
-      </button>
-      <template v-if="auth.esDirectorOAdmin()">
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'formas-pago' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'formas-pago'"
-      >
-        Formas de pago
-      </button>
-      <button
-        class="border-b-2 px-1 pb-2 font-medium"
-        :class="tab === 'bitacora' ? 'border-brand-600 text-brand-700' : 'border-transparent text-espresso-800/40'"
-        @click="tab = 'bitacora'"
-      >
-        Bitácora
-      </button>
-      </template>
     </div>
 
     <!-- Usuarios -->
     <section v-if="tab === 'usuarios'">
       <div class="mb-5 flex items-center justify-between">
         <p class="font-display text-lg font-semibold text-espresso-800">Usuarios</p>
-        <!-- solo el Administrador gestiona usuarios; el Director los ve en modo lectura -->
+        <!-- con "Gestionar usuarios" se modifican; con "Ver usuarios" solo se ven -->
         <button
-          v-if="auth.esAdmin()"
+          v-if="auth.puede('usuarios.gestionar')"
           class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
           @click="mostrarFormUsuario = !mostrarFormUsuario"
         >
           {{ mostrarFormUsuario ? 'Cancelar' : 'Nuevo usuario' }}
         </button>
         <span v-else class="rounded-full bg-espresso-800/10 px-3 py-1 text-xs font-medium text-espresso-800/60">
-          Solo lectura: únicamente el Administrador puede modificar usuarios
+          Solo lectura: tu cargo no puede modificar usuarios
         </span>
       </div>
 
-      <form v-if="mostrarFormUsuario && auth.esAdmin()" class="mb-6 grid grid-cols-2 gap-4 rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm" @submit.prevent="crearUsuario">
+      <form v-if="mostrarFormUsuario && auth.puede('usuarios.gestionar')" class="mb-6 grid grid-cols-2 gap-4 rounded-xl border border-gold-300/30 bg-cream-50 p-5 shadow-sm" @submit.prevent="crearUsuario">
         <div>
           <label class="mb-1 block text-sm font-medium text-espresso-700">Nombre</label>
           <input v-model="formUsuario.name" required maxlength="100" placeholder="Juan Pérez" class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200" />
@@ -812,7 +859,7 @@ onMounted(() => {
         <div>
           <label class="mb-1 block text-sm font-medium text-espresso-700">Cargo</label>
           <select v-model="formUsuario.rol" required class="w-full rounded-lg border border-espresso-800/15 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
-            <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
+            <option v-for="r in rolesAsignables" :key="r" :value="r">{{ r }}</option>
           </select>
         </div>
         <div>
@@ -864,7 +911,7 @@ onMounted(() => {
                 </td>
                 <td class="px-4 py-2.5">
                   <select v-model="formEditUsuario.rol" required title="Cargo" class="w-full rounded-lg border border-espresso-800/15 bg-white px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
-                    <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
+                    <option v-for="r in rolesAsignables" :key="r" :value="r">{{ r }}</option>
                   </select>
                 </td>
                 <td class="px-4 py-2.5">
@@ -905,7 +952,7 @@ onMounted(() => {
                   </span>
                 </td>
                 <td class="px-4 py-2.5">
-                  <div v-if="auth.esAdmin()" class="flex justify-end gap-1">
+                  <div v-if="auth.puede('usuarios.gestionar') && (auth.esAdmin() || u.rol !== 'Admin')" class="flex justify-end gap-1">
                     <button type="button" title="Editar" :disabled="accionEnCursoUsuario === u.id" class="rounded-lg p-1.5 text-brand-700 hover:bg-brand-50 disabled:opacity-40" @click="iniciarEdicionUsuario(u)">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4"><path stroke-linecap="round" stroke-linejoin="round" :d="iconEditar" /></svg>
                     </button>
@@ -942,6 +989,59 @@ onMounted(() => {
             </tr>
             <tr v-if="!cargandoUsuarios && usuarios.length === 0">
               <td colspan="6" class="px-4 py-8 text-center text-espresso-800/40">Sin usuarios</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Permisos (solo el Administrador) -->
+    <section v-if="tab === 'permisos'">
+      <p class="mb-1 font-display text-lg font-semibold text-espresso-800">Permisos por cargo</p>
+      <p class="mb-4 text-sm text-espresso-800/60">
+        Marca lo que puede hacer cada cargo; el cambio se guarda al instante. El Administrador siempre tiene todos los permisos.
+        Buscar villas, el estado de cuenta por villa y la reimpresión los ven todos los cargos. Quien tenga la sesión abierta
+        verá los botones nuevos al recargar la página.
+      </p>
+
+      <div class="overflow-x-auto rounded-xl border border-gold-300/30 bg-cream-50 shadow-sm">
+        <table class="min-w-full divide-y divide-gold-300/20 text-sm">
+          <thead class="bg-brand-50/60">
+            <tr>
+              <th class="px-4 py-2.5 text-left font-medium text-espresso-800/70">Permiso</th>
+              <th v-for="r in rolesPermisos" :key="r.id" class="w-28 px-3 py-2.5 text-center font-medium text-espresso-800/70">
+                {{ r.nombre }}
+              </th>
+            </tr>
+          </thead>
+          <tbody v-for="g in gruposPermisos" :key="g.grupo" class="divide-y divide-gold-300/15">
+            <tr class="bg-cream-100/70">
+              <td :colspan="rolesPermisos.length + 1" class="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-espresso-800/50">
+                {{ g.grupo }}
+              </td>
+            </tr>
+            <tr v-for="p in g.permisos" :key="p.clave" class="hover:bg-brand-50/40">
+              <td class="px-4 py-2">
+                <p class="font-medium text-espresso-900">{{ p.etiqueta }}</p>
+                <p class="text-xs text-espresso-800/55">{{ p.descripcion }}</p>
+              </td>
+              <td v-for="r in rolesPermisos" :key="r.id" class="px-3 py-2 text-center">
+                <input
+                  type="checkbox"
+                  :checked="r.permisos.includes(p.clave)"
+                  :disabled="!r.editable || guardandoPermiso !== null"
+                  :title="r.editable ? '' : 'El Administrador siempre tiene todos los permisos'"
+                  :aria-label="`${r.nombre}: ${p.etiqueta}`"
+                  class="h-4 w-4 accent-brand-600"
+                  :class="r.editable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
+                  @change="cambiarPermiso(r, p.clave, ($event.target as HTMLInputElement).checked)"
+                />
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-if="!cargandoPermisos && catalogoPermisos.length === 0">
+            <tr>
+              <td :colspan="rolesPermisos.length + 1" class="px-4 py-8 text-center text-espresso-800/40">No se pudieron cargar los permisos</td>
             </tr>
           </tbody>
         </table>

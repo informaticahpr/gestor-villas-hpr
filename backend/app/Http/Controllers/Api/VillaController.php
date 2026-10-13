@@ -96,13 +96,13 @@ class VillaController extends Controller
 
     /**
      * Crea la villa con su propietario (uno nuevo, o uno ya registrado si llega propietario.id) y,
-     * si se llenó algún dato, su encargado. Cualquier usuario puede crear villas; solo Director/Admin
-     * pueden modificar los datos de un propietario ya registrado (el Supervisor solo lo vincula).
+     * si se llenó algún dato, su encargado. Quien puede crear villas pero no editarlas
+     * (permiso villas.editar) solo vincula a un propietario ya registrado, sin modificar sus datos.
      */
     public function store(Request $request)
     {
         $data = $this->validated($request, creando: true);
-        $puedeEditarPropietario = in_array($request->user()->role?->nombre, [Role::DIRECTOR, Role::ADMIN], true);
+        $puedeEditarPropietario = $request->user()->tienePermiso('villas.editar');
 
         $villa = DB::transaction(function () use ($data, $puedeEditarPropietario) {
             $propietario = $this->guardarPropietario($data['propietario'], $puedeEditarPropietario);
@@ -117,7 +117,7 @@ class VillaController extends Controller
     }
 
     /**
-     * Solo Director/Admin (ver routes/api.php). Si la villa cambia de propietario o de encargado, el
+     * Con el permiso villas.editar (ver routes/api.php). Si la villa cambia de propietario o de encargado, el
      * que sale queda guardado en el historial de la villa con sus datos tal como estaban.
      */
     public function update(Request $request, string $villa)

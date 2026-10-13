@@ -13,14 +13,26 @@ const villas = ref<VillaResumen[]>([])
 const cargando = ref(false)
 const villaSeleccionada = ref<string | null>(null)
 
+let temporizador: ReturnType<typeof setTimeout> | undefined
+// una respuesta vieja (de lo que se escribio antes) no pisa a la mas reciente
+let ultimaConsulta = 0
+
 async function buscar() {
+  clearTimeout(temporizador)
+  const id = ++ultimaConsulta
   cargando.value = true
   try {
     const { data } = await api.get('/api/villas', { params: { q: q.value } })
-    villas.value = data.data
+    if (id === ultimaConsulta) villas.value = data.data
   } finally {
-    cargando.value = false
+    if (id === ultimaConsulta) cargando.value = false
   }
+}
+
+// busca sola mientras se escribe (Enter o el boton Buscar lo hacen al instante)
+function buscarAlEscribir() {
+  clearTimeout(temporizador)
+  temporizador = setTimeout(buscar, 250)
 }
 
 // se refresca sola si se crea/edita una villa o se aplica un cargo desde otra
@@ -48,6 +60,7 @@ onMounted(buscar)
         v-model="q"
         type="text"
         placeholder="Ej. A-1 o Sánchez..."
+        @input="buscarAlEscribir"
         class="w-full max-w-sm rounded-lg border border-espresso-800/15 bg-cream-50 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
       />
       <button type="submit" class="rounded-lg bg-gradient-to-r from-wine-500 via-brand-500 to-gold-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">

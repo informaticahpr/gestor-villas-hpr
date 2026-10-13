@@ -28,7 +28,7 @@ const dialog = useDialogStore()
 const esEdicion = computed(() => Boolean(props.villaId))
 const editando = ref(false)
 const soloLectura = computed(() => esEdicion.value && !editando.value)
-const puedeEditar = computed(() => auth.esDirectorOAdmin())
+const puedeEditar = computed(() => auth.puede('villas.editar'))
 
 type Pestana = 'propietario' | 'encargado' | 'villa' | 'reporte' | 'historial'
 const tab = ref<Pestana>('propietario')
