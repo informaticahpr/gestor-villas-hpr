@@ -6,124 +6,49 @@ use App\Models\Encargado;
 use App\Models\Villa;
 use Carbon\CarbonInterface;
 
-/**
- * Para la bitacora: que cambio al editar una villa (datos de la villa, del propietario y del
- * encargado), con el valor anterior y el nuevo, con los mismos nombres que usa el formulario.
- */
+/** Para la bitacora: que parte de la villa se edito (datos de villa, de propietario o de encargado). */
 class CambiosVilla
 {
     private const CAMPOS_VILLA = [
-        'DIR' => 'Ubicación',
-        'FCONTRUC' => 'Fecha de entrega',
-        'NOMED' => 'Medidor ENEE',
-        'CLAVE_CATASTRAL' => 'Clave catastral',
-        'DESCRIPCION_IP' => 'Descripción IP',
-        'OBSERVACION' => 'Observación',
-        'NOHAB' => '# Habitaciones',
-        'NOBATH' => '# Baños',
-        'APLICOBRO' => 'Aplicar cuota mensual',
-        'CUOTA_ESPECIAL' => 'Cuota especial',
+        'DIR', 'FCONTRUC', 'NOMED', 'CLAVE_CATASTRAL', 'DESCRIPCION_IP', 'OBSERVACION', 'NOHAB', 'NOBATH',
+        'APLICOBRO', 'CUOTA_ESPECIAL',
     ];
 
-    private const CAMPOS_PERSONA = [
-        'NOMBRES' => 'Nombres',
-        'APELLIDOS' => 'Apellidos',
-        'DNI' => 'DNI / Pasaporte',
-        'PARENTESCO' => 'Parentesco',
-        'FECHA_NAC' => 'Fecha de nacimiento',
-        'TELF' => 'Celular 1',
-        'CELULAR' => 'Celular 2',
-        'OTRO_TEL' => 'Otro teléfono',
-        'MAIL' => 'Correo 1',
-        'MAIL2' => 'Correo 2',
-    ];
-
-    /** Un valor largo (ej. la observacion) se corta para que la bitacora siga siendo legible. */
-    private const MAX_VALOR = 80;
+    private const CAMPOS_PROPIETARIO = ['NOMBRES', 'APELLIDOS', 'DNI', 'TELF', 'CELULAR', 'OTRO_TEL', 'MAIL', 'MAIL2', 'FECHA_NAC'];
 
     /** Los datos de la villa tal como estan ahora (con su propietario y encargado cargados). */
     public static function foto(Villa $villa): array
     {
-        $persona = fn ($p, array $campos) => $p ? collect($campos)->mapWithKeys(fn ($c) => [$c => self::valor($p->{$c})])->all() : null;
+        $datos = fn ($modelo, array $campos) => $modelo
+            ? collect($campos)->mapWithKeys(fn ($c) => [$c => self::valor($modelo->{$c})])->all()
+            : null;
 
         return [
-            'villa' => collect(array_keys(self::CAMPOS_VILLA))->mapWithKeys(fn ($c) => [$c => self::valor($villa->{$c})])->all(),
-            'propietario_id' => $villa->propietario?->id,
-            'propietario' => $persona($villa->propietario, array_diff(array_keys(self::CAMPOS_PERSONA), ['PARENTESCO'])),
-            'encargado' => $persona($villa->encargado, Encargado::CAMPOS),
+            'villa' => $datos($villa, self::CAMPOS_VILLA),
+            // otro propietario (otro id) tambien cuenta como cambio
+            'propietario' => ['id' => $villa->propietario?->id] + ($datos($villa->propietario, self::CAMPOS_PROPIETARIO) ?? []),
+            'encargado' => $datos($villa->encargado, Encargado::CAMPOS),
         ];
     }
 
-    /** @return list<string> ej. ["Ubicación: 'Bloque Z' → 'Bloque Z, frente a la piscina'", ...] */
-    public static function describir(array $antes, array $despues): array
+    /** @return list<string> las partes que cambiaron: 'villa', 'propietario' y/o 'encargado' */
+    public static function partesEditadas(array $antes, array $despues): array
     {
-        $cambios = self::camposCambiados($antes['villa'], $despues['villa'], self::CAMPOS_VILLA);
-
-        if ($antes['propietario_id'] !== $despues['propietario_id']) {
-            $cambios[] = 'Propietario: '.self::nombre($antes['propietario']).' → '.self::nombre($despues['propietario']);
-        } else {
-            $cambios = [...$cambios, ...self::camposCambiados($antes['propietario'] ?? [], $despues['propietario'] ?? [], self::CAMPOS_PERSONA, 'Propietario · ')];
-        }
-
-        $encAntes = $antes['encargado'];
-        $encDespues = $despues['encargado'];
-        if (! $encAntes || ! $encDespues || self::nombre($encAntes) !== self::nombre($encDespues)) {
-            if ($encAntes !== $encDespues) {
-                $cambios[] = 'Encargado: '.self::nombre($encAntes).' → '.self::nombre($encDespues);
-            }
-        } else {
-            $cambios = [...$cambios, ...self::camposCambiados($encAntes, $encDespues, self::CAMPOS_PERSONA, 'Encargado · ')];
-        }
-
-        return $cambios;
+        return array_keys(array_filter(['villa' => 0, 'propietario' => 0, 'encargado' => 0], fn ($_, $parte) => $antes[$parte] !== $despues[$parte], ARRAY_FILTER_USE_BOTH));
     }
 
-    private static function camposCambiados(array $antes, array $despues, array $etiquetas, string $prefijo = ''): array
-    {
-        $cambios = [];
-        foreach ($etiquetas as $campo => $etiqueta) {
-            if (! array_key_exists($campo, $antes) && ! array_key_exists($campo, $despues)) {
-                continue;
-            }
-            $a = $antes[$campo] ?? null;
-            $d = $despues[$campo] ?? null;
-            if ($a !== $d) {
-                $cambios[] = "{$prefijo}{$etiqueta}: ".self::mostrar($a).' → '.self::mostrar($d);
-            }
-        }
-
-        return $cambios;
-    }
-
-    /** Normaliza para comparar: '' y null son lo mismo; fechas como d/m/Y; si/no para las casillas. */
-    private static function valor(mixed $v): ?string
+    /** '' y null son lo mismo; las fechas se comparan por dia. */
+    private static function valor(mixed $v): mixed
     {
         if ($v instanceof CarbonInterface) {
-            return $v->format('d/m/Y');
+            return $v->toDateString();
         }
-        if (is_bool($v)) {
-            return $v ? 'Sí' : 'No';
-        }
-        $v = trim((string) $v);
+        if (is_string($v)) {
+            $v = trim($v);
 
-        return $v === '' ? null : $v;
-    }
-
-    private static function mostrar(?string $v): string
-    {
-        if ($v === null) {
-            return '(vacío)';
+            return $v === '' ? null : $v;
         }
 
-        return "'".(mb_strlen($v) > self::MAX_VALOR ? mb_substr($v, 0, self::MAX_VALOR).'…' : $v)."'";
-    }
-
-    private static function nombre(?array $persona): string
-    {
-        if (! $persona) {
-            return '(ninguno)';
-        }
-
-        return "'".trim(($persona['NOMBRES'] ?? '').' '.($persona['APELLIDOS'] ?? ''))."'";
+        return $v;
     }
 }

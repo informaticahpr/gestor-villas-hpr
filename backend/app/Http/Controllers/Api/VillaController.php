@@ -158,9 +158,12 @@ class VillaController extends Controller
         });
 
         $villa->refresh()->load(['propietario', 'encargado']);
-        // guardar sin cambiar nada no deja registro
-        if ($cambios = CambiosVilla::describir($fotoAntes, CambiosVilla::foto($villa))) {
-            Bitacora::registrar('villa', 'editar', "Editó la villa {$villa->CLV_CLIE}: ".implode('; ', $cambios).'.');
+        // ej. "Editó datos de villa y de propietario (villa A-2)."; guardar sin cambiar nada no deja registro
+        if ($partes = CambiosVilla::partesEditadas($fotoAntes, CambiosVilla::foto($villa))) {
+            $partes = array_map(fn ($p) => "de {$p}", $partes);
+            $ultima = array_pop($partes);
+            $texto = $partes ? implode(', ', $partes)." y {$ultima}" : $ultima;
+            Bitacora::registrar('villa', 'editar', "Editó datos {$texto} (villa {$villa->CLV_CLIE}).");
         }
 
         return response()->json(['villa' => $this->detalle($villa)]);
