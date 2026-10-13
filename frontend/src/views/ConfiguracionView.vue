@@ -612,6 +612,7 @@ const filtroHasta = ref('')
 
 const ENTIDADES: Array<{ value: EntidadBitacora; label: string }> = [
   { value: 'usuario', label: 'Usuarios' },
+  { value: 'villa', label: 'Villas' },
   { value: 'concepto', label: 'Conceptos' },
   { value: 'forma_pago', label: 'Formas de pago' },
   { value: 'cuota_especial', label: 'Cuotas especiales' },

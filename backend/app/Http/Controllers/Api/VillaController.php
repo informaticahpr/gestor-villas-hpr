@@ -7,10 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
 use App\Models\Encargado;
 use App\Models\Propietario;
-use App\Models\Role;
 use App\Models\Villa;
 use App\Models\VillaHistorial;
 use App\Services\SaldoService;
+use App\Support\CambiosVilla;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -113,7 +113,10 @@ class VillaController extends Controller
             return $villa;
         });
 
-        return response()->json(['villa' => $this->detalle($villa->refresh())], 201);
+        $villa->refresh()->load('propietario');
+        Bitacora::registrar('villa', 'crear', "Creó la villa {$villa->CLV_CLIE} (propietario {$villa->propietario?->NOMBRES} {$villa->propietario?->APELLIDOS}).");
+
+        return response()->json(['villa' => $this->detalle($villa)], 201);
     }
 
     /**
@@ -125,6 +128,7 @@ class VillaController extends Controller
         $villa = Villa::with(['propietario', 'encargado'])->findOrFail($villa);
         $data = $this->validated($request, creando: false);
         $usuarioId = $request->user()->id;
+        $fotoAntes = CambiosVilla::foto($villa);
 
         DB::transaction(function () use ($villa, $data, $usuarioId) {
             // "fotos" de quienes estaban antes del cambio (antes de guardar, por si se editan sus datos)
@@ -153,7 +157,13 @@ class VillaController extends Controller
             $this->guardarEncargado($villa, $data['encargado']);
         });
 
-        return response()->json(['villa' => $this->detalle($villa->refresh())]);
+        $villa->refresh()->load(['propietario', 'encargado']);
+        // guardar sin cambiar nada no deja registro
+        if ($cambios = CambiosVilla::describir($fotoAntes, CambiosVilla::foto($villa))) {
+            Bitacora::registrar('villa', 'editar', "Editó la villa {$villa->CLV_CLIE}: ".implode('; ', $cambios).'.');
+        }
+
+        return response()->json(['villa' => $this->detalle($villa)]);
     }
 
     private function registrarEnHistorial(Villa $villa, string $tipo, array $datos, int $usuarioId, $desde, ?int $propietarioId = null): void
