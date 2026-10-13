@@ -61,7 +61,8 @@ class SaldoService
                 $g->wrap('movimientos.IMPORTE'),
             ))
             ->get()
-            ->mapWithKeys(fn ($fila) => [$fila->villa => round((float) $fila->saldo, 2)]);
+            // "+ 0.0" convierte un -0 (cargos y abonos que se cancelan con decimales) en 0
+            ->mapWithKeys(fn ($fila) => [$fila->villa => round((float) $fila->saldo, 2) + 0.0]);
     }
 
     public function recalcularSaldo(Villa $villa): Villa
@@ -77,26 +78,52 @@ class SaldoService
      */
     public function estadoDeCuenta(Villa $villa, Carbon $desde, Carbon $hasta): Collection
     {
-        $saldoInicial = $this->saldoDeVilla($villa, $desde->copy()->subDay());
+        return $this->estadosDeCuenta(collect([$villa]), $desde, $hasta)->get($villa->CLV_CLIE);
+    }
+
+    /**
+     * Estado de cuenta de varias villas [CLV_CLIE => estado] con unas pocas consultas para todas (no
+     * unas por villa: con todas las villas y la base en otro servidor, eso tardaba demasiado).
+     *
+     * @param  Collection<int, Villa>  $villas
+     * @return Collection<string, Collection>
+     */
+    public function estadosDeCuenta(Collection $villas, Carbon $desde, Carbon $hasta): Collection
+    {
+        $claves = $villas->pluck('CLV_CLIE')->all();
+
+        $saldosIniciales = $this->saldosPorVilla($desde->copy()->subDay());
 
         $movimientos = Movimiento::with('concepto')
-            ->where('CLV_CLIE', $villa->CLV_CLIE)
+            ->whereIn('CLV_CLIE', $claves)
             // por dia (whereDate): en SQLite la fecha puede estar guardada con o sin hora, y un
             // whereBetween dejaba fuera el primer o el ultimo dia del rango
             ->whereDate('FECHA_APLI', '>=', $desde->toDateString())
             ->whereDate('FECHA_APLI', '<=', $hasta->toDateString())
             ->orderBy('FECHA_APLI')
             ->orderBy('ID_MOV')
-            ->get();
+            ->get()
+            ->groupBy('CLV_CLIE');
 
         // meses en que no se le cobro la cuota por estar alquilada a producción: lineas informativas, sin
         // monto (no cambian el saldo), despues de los movimientos de ese mismo dia
-        $exenciones = ExencionCuota::where('CLV_CLIE', $villa->CLV_CLIE)
+        $exenciones = ExencionCuota::whereIn('CLV_CLIE', $claves)
             ->whereDate('FECHA', '>=', $desde->toDateString())
             ->whereDate('FECHA', '<=', $hasta->toDateString())
             ->orderBy('FECHA')
-            ->get();
+            ->get()
+            ->groupBy('CLV_CLIE');
 
+        return $villas->mapWithKeys(fn (Villa $v) => [$v->CLV_CLIE => $this->armarEstadoDeCuenta(
+            $saldosIniciales->get($v->CLV_CLIE, 0.0),
+            $movimientos->get($v->CLV_CLIE, collect()),
+            $exenciones->get($v->CLV_CLIE, collect())->values(),
+        )]);
+    }
+
+    /** Filas con saldo corrido a partir del saldo inicial, los movimientos y las exenciones del rango. */
+    private function armarEstadoDeCuenta(float $saldoInicial, Collection $movimientos, Collection $exenciones): Collection
+    {
         $saldoCorrido = $saldoInicial;
         $filas = collect();
         $agregarExencionesHasta = function (?string $fecha) use (&$exenciones, &$filas, &$saldoCorrido) {
@@ -147,11 +174,13 @@ class SaldoService
      */
     public function saldosGenerales(Carbon $hasta, bool $omitirAlDia = false, bool $omitirAFavor = false, bool $soloNegativos = false): Collection
     {
-        return Villa::todasEnOrden()->map(function (Villa $villa) use ($hasta) {
+        $saldos = $this->saldosPorVilla($hasta);
+
+        return Villa::todasEnOrden()->map(function (Villa $villa) use ($saldos) {
             return [
                 'villa' => $villa->CLV_CLIE,
                 'propietario' => $villa->nombre_completo,
-                'saldo' => $this->saldoDeVilla($villa, $hasta),
+                'saldo' => $saldos->get($villa->CLV_CLIE, 0.0),
             ];
         })->filter(function (array $fila) use ($omitirAlDia, $omitirAFavor, $soloNegativos) {
             if ($soloNegativos) {
@@ -186,18 +215,31 @@ class SaldoService
 
         $filas = collect();
 
-        foreach (Villa::todasEnOrden() as $villa) {
-            $saldo = $this->saldoDeVilla($villa, $hasta);
+        // todo de una vez para todas las villas (no consultas por villa; ver estadosDeCuenta)
+        $saldos = $this->saldosPorVilla($hasta);
+        $deudoras = Villa::todasEnOrden()->filter(fn (Villa $v) => $saldos->get($v->CLV_CLIE, 0.0) > 0);
+        $claves = $deudoras->pluck('CLV_CLIE')->all();
 
-            if ($saldo <= 0) {
-                continue; // al dia o con saldo a favor, no aplica antiguedad de deuda
-            }
+        $cargosPorVilla = Movimiento::whereIn('CLV_CLIE', $claves)
+            ->where('FECHA_APLI', '<=', $hasta)
+            ->whereHas('concepto', fn ($q) => $q->where('ES_CARGO', true))
+            ->orderBy('FECHA_APLI')
+            ->orderBy('ID_MOV')
+            ->get(['CLV_CLIE', 'IMPORTE', 'FECHA_APLI', 'FECHA_VENC'])
+            ->groupBy('CLV_CLIE');
 
-            $cargos = Movimiento::where('CLV_CLIE', $villa->CLV_CLIE)
-                ->where('FECHA_APLI', '<=', $hasta)
-                ->whereHas('concepto', fn ($q) => $q->where('ES_CARGO', true))
-                ->orderBy('FECHA_APLI')
-                ->get(['IMPORTE', 'FECHA_APLI', 'FECHA_VENC'])
+        $g = DB::getQueryGrammar();
+        $abonosPorVilla = Movimiento::whereIn('CLV_CLIE', $claves)
+            ->where('FECHA_APLI', '<=', $hasta)
+            ->whereHas('concepto', fn ($q) => $q->where('ES_CARGO', false))
+            ->groupBy('CLV_CLIE')
+            ->selectRaw(sprintf('%s as villa, SUM(%s) as total', $g->wrap('CLV_CLIE'), $g->wrap('IMPORTE')))
+            ->pluck('total', 'villa');
+
+        foreach ($deudoras as $villa) {
+            $saldo = $saldos->get($villa->CLV_CLIE);
+
+            $cargos = $cargosPorVilla->get($villa->CLV_CLIE, collect())
                 ->map(fn ($m) => [
                     'restante' => (float) $m->IMPORTE,
                     // la antiguedad de la deuda se cuenta desde el vencimiento si existe;
@@ -205,10 +247,7 @@ class SaldoService
                     'fecha' => $m->FECHA_VENC ?? $m->FECHA_APLI,
                 ]);
 
-            $abonosDisponibles = (float) Movimiento::where('CLV_CLIE', $villa->CLV_CLIE)
-                ->where('FECHA_APLI', '<=', $hasta)
-                ->whereHas('concepto', fn ($q) => $q->where('ES_CARGO', false))
-                ->sum('IMPORTE');
+            $abonosDisponibles = (float) $abonosPorVilla->get($villa->CLV_CLIE, 0);
 
             $fechaCargoMasViejoPendiente = null;
 

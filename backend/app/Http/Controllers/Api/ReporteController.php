@@ -252,16 +252,17 @@ class ReporteController extends Controller
         $hasta = Carbon::parse($data['hasta']);
 
         $villas = isset($data['villa'])
-            ? Villa::where('CLV_CLIE', $data['villa'])->get()
+            ? Villa::with('propietario')->where('CLV_CLIE', $data['villa'])->get()
             : Villa::todasEnOrden();
 
         $saldos = $this->saldoService->saldosPorVilla();
+        $estados = $this->saldoService->estadosDeCuenta($villas, $desde, $hasta);
 
         $reportes = $villas->map(fn (Villa $v) => [
             'villa' => $v->CLV_CLIE,
             'propietario' => $v->nombre_completo,
             'saldo_actual' => $saldos->get($v->CLV_CLIE, 0.0),
-            'estado_cuenta' => $this->saldoService->estadoDeCuenta($v, $desde, $hasta),
+            'estado_cuenta' => $estados->get($v->CLV_CLIE),
         ]);
 
         return [$reportes, $desde, $hasta, $data['villa'] ?? null];

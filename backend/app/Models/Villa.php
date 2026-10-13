@@ -54,10 +54,13 @@ class Villa extends Model
         return $villas->sortBy('CLV_CLIE', SORT_NATURAL | SORT_FLAG_CASE)->values();
     }
 
-    /** Todas las villas en orden natural (ver enOrdenNatural). */
+    /**
+     * Todas las villas en orden natural (ver enOrdenNatural), con su propietario ya cargado: los reportes
+     * muestran su nombre y, sin esto, se consultaba uno por villa.
+     */
     public static function todasEnOrden(): Collection
     {
-        return static::enOrdenNatural(static::all());
+        return static::enOrdenNatural(static::with('propietario')->get());
     }
 
     /**
