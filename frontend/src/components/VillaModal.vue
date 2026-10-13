@@ -593,10 +593,10 @@ const claseCheck = 'h-4 w-4 rounded border-espresso-800/25 text-brand-600 focus:
                   <label :class="claseLabel">Observación de la villa</label>
                   <textarea
                     :value="villa.OBSERVACION"
-                    rows="2"
+                    rows="6"
                     maxlength="500"
                     placeholder="VILLA A NOMBRE DE JUAN PÉREZ / MARÍA LÓPEZ"
-                    :class="[claseInput, 'resize-none']"
+                    :class="[claseInput, 'resize-y']"
                     @input="villa.OBSERVACION = mayusculas(valor($event))"
                   />
                 </div>
