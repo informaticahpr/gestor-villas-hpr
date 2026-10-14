@@ -71,15 +71,15 @@ function valor(e: Event): string {
       <div class="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-3">
         <div>
           <label :class="claseLabel">Celular 1</label>
-          <input :value="p.TELF" inputmode="numeric" maxlength="20" title="Solo números" placeholder="9897-2123" :class="claseInput" @input="p.TELF = soloTelefono(valor($event))" />
+          <input :value="p.TELF" inputmode="tel" maxlength="20" title="Números, espacios, guion, paréntesis y +" placeholder="9897-2123" :class="claseInput" @input="p.TELF = soloTelefono(valor($event))" />
         </div>
         <div>
           <label :class="claseLabel">Celular 2</label>
-          <input :value="p.CELULAR" inputmode="numeric" maxlength="20" title="Solo números" placeholder="9988-1201" :class="claseInput" @input="p.CELULAR = soloTelefono(valor($event))" />
+          <input :value="p.CELULAR" inputmode="tel" maxlength="20" title="Números, espacios, guion, paréntesis y +" placeholder="9988-1201" :class="claseInput" @input="p.CELULAR = soloTelefono(valor($event))" />
         </div>
         <div>
           <label :class="claseLabel">Otro</label>
-          <input :value="p.OTRO_TEL" inputmode="numeric" maxlength="20" title="Solo números" placeholder="2234-5601" :class="claseInput" @input="p.OTRO_TEL = soloTelefono(valor($event))" />
+          <input :value="p.OTRO_TEL" inputmode="tel" maxlength="20" title="Números, espacios, guion, paréntesis y +" placeholder="2234-5601" :class="claseInput" @input="p.OTRO_TEL = soloTelefono(valor($event))" />
         </div>
       </div>
     </div>

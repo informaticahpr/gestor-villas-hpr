@@ -308,9 +308,10 @@ class VillaController extends Controller
     private const REGEX_SOLO_LETRAS = 'regex:/^[\pL\s]+$/u';
 
     /**
-     * Solo digitos, con guiones/espacios opcionales para el formato "9897-2123".
+     * Telefono: digitos con guiones, espacios y parentesis opcionales, y un + al inicio para numeros
+     * extranjeros ("9897-2123", "+1 (305) 555-1234"). Debe tener al menos un digito.
      */
-    private const REGEX_SOLO_NUMEROS = 'regex:/^[0-9][0-9\-\s]*$/';
+    private const REGEX_SOLO_NUMEROS = 'regex:/^\+?(?=[^+]*\d)[0-9()\-\s]+$/';
 
     /**
      * Ademas de la regla 'email' de Laravel (que acepta direcciones sin dominio real,
@@ -411,9 +412,9 @@ class VillaController extends Controller
                 "$p.APELLIDOS.max" => "Los apellidos $de no pueden superar los 60 caracteres.",
                 "$p.APELLIDOS.regex" => "El apellido $de solo puede contener letras.",
                 "$p.DNI.max" => "El DNI/Pasaporte $de no puede superar los 30 caracteres.",
-                "$p.TELF.regex" => "El celular 1 $de solo puede contener números.",
-                "$p.CELULAR.regex" => "El celular 2 $de solo puede contener números.",
-                "$p.OTRO_TEL.regex" => "El teléfono $de solo puede contener números.",
+                "$p.TELF.regex" => "El celular 1 $de solo puede contener números, espacios, guion, paréntesis y + al inicio.",
+                "$p.CELULAR.regex" => "El celular 2 $de solo puede contener números, espacios, guion, paréntesis y + al inicio.",
+                "$p.OTRO_TEL.regex" => "El teléfono $de solo puede contener números, espacios, guion, paréntesis y + al inicio.",
                 "$p.MAIL.email" => "El correo $de no tiene un formato válido.",
                 "$p.MAIL.regex" => 'El correo debe tener un dominio válido, ej. nombre@dominio.com.',
                 "$p.MAIL2.email" => "El correo $de no tiene un formato válido.",

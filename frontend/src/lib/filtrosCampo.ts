@@ -8,9 +8,9 @@ export function soloLetras(valor: string): string {
   return valor.replace(/[^\p{L}\s]/gu, '').toUpperCase()
 }
 
-/** Telefonos: solo digitos y guion (formato 9897-2123). */
+/** Telefonos: digitos, guion, espacio, parentesis y + (9897-2123, +1 (305) 555-1234). */
 export function soloTelefono(valor: string): string {
-  return valor.replace(/[^0-9-]/g, '')
+  return valor.replace(/[^0-9()+\s-]/g, '')
 }
 
 /** Cantidades enteras (habitaciones, baños): solo digitos. */
